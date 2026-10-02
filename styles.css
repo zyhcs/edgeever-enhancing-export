@@ -11,7 +11,7 @@
   --ee-export-text: #0f172a;
   --ee-export-text-muted: #64748b;
   --ee-export-card-hover: #f1f5f9;
-  --ee-export-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.22), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  --ee-export-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.28), 0 0 1px 1px rgba(0, 0, 0, 0.06);
 }
 
 .dark {
@@ -22,7 +22,7 @@
   --ee-export-text: #f4f4f5;
   --ee-export-text-muted: #a1a1aa;
   --ee-export-card-hover: #323238;
-  --ee-export-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  --ee-export-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 
 /* 顶部/工具栏快捷触发按钮 */
@@ -30,7 +30,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 11px;
+  padding: 5px 12px;
   font-size: 13px;
   font-weight: 550;
   color: var(--ee-export-text);
@@ -64,14 +64,14 @@
 .edgeever-export-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
   animation: eeFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -80,11 +80,11 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-/* 弹窗主体 */
+/* 弹窗主体（大尺寸宽屏体验） */
 .edgeever-export-modal {
-  width: 920px;
-  max-width: 95vw;
-  max-height: 90vh;
+  width: 1100px;
+  max-width: 96vw;
+  height: 86vh;
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
   border-radius: 18px;
@@ -101,7 +101,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px 14px 24px;
+  padding: 14px 22px;
   border-bottom: 1px solid var(--ee-export-border);
   flex-shrink: 0;
 }
@@ -113,19 +113,19 @@
 }
 
 .edgeever-export-modal-icon {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: rgba(16, 185, 129, 0.12);
   color: var(--ee-export-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .edgeever-export-modal-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 650;
   margin: 0;
 }
@@ -156,69 +156,80 @@
   color: var(--ee-export-text);
 }
 
-/* 弹窗主体内容（左右分栏） */
+/* 弹窗主体双栏布局 */
 .edgeever-export-modal-body {
   display: flex;
   flex: 1;
   overflow: hidden;
-  min-height: 440px;
 }
 
-/* 左侧：格式选择区 */
-.edgeever-export-formats-pane {
-  width: 380px;
+/* 左侧控制栏 (360px) */
+.edgeever-export-sidebar {
+  width: 360px;
   border-right: 1px solid var(--ee-export-border);
   background: var(--ee-export-bg-subtle);
-  padding: 16px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
   flex-shrink: 0;
 }
 
+.edgeever-export-sidebar-scroll {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
 .edgeever-export-section-title {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ee-export-text-muted);
   margin-bottom: 2px;
 }
 
+/* 格式选择卡片 */
+.edgeever-export-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .edgeever-export-format-card {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
   border: 1.5px solid transparent;
   background: var(--ee-export-bg-modal);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   cursor: pointer;
-  transition: all 0.16s ease;
+  transition: all 0.15s ease;
 }
 
 .edgeever-export-format-card:hover {
   background: var(--ee-export-card-hover);
   border-color: var(--ee-export-border);
-  transform: translateY(-1px);
 }
 
 .edgeever-export-format-card.is-selected {
   border-color: var(--ee-export-primary);
-  background: rgba(16, 185, 129, 0.04);
+  background: rgba(16, 185, 129, 0.05);
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 
 .format-card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
   background: var(--ee-export-bg-subtle);
   border: 1px solid var(--ee-export-border);
@@ -233,19 +244,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
 }
 
 .format-card-name {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--ee-export-text);
 }
 
 .format-card-ext {
-  font-size: 11px;
-  font-family: SFMono-Regular, Menlo, Consolas, monospace;
-  padding: 1px 6px;
+  font-size: 10.5px;
+  font-family: SFMono-Regular, Menlo, monospace;
+  padding: 1px 5px;
   border-radius: 4px;
   background: var(--ee-export-bg-subtle);
   color: var(--ee-export-text-muted);
@@ -253,50 +263,21 @@
 }
 
 .format-card-desc {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ee-export-text-muted);
-  margin-top: 3px;
-  line-height: 1.35;
+  margin-top: 2px;
+  line-height: 1.3;
 }
 
-.format-card-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-top: 5px;
-  text-transform: uppercase;
-}
-
-.badge-builtin {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
-}
-
-.badge-pandoc {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-}
-
-/* 右侧：参数微调与预览区 */
-.edgeever-export-options-pane {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
+/* 控制表单组 */
 .edgeever-form-group {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .edgeever-form-label {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--ee-export-text);
   display: flex;
@@ -312,12 +293,12 @@
 
 .edgeever-input-text {
   width: 100%;
-  padding: 9px 12px;
-  font-size: 13.5px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: var(--ee-export-text);
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 9px;
+  border-radius: 8px;
   box-sizing: border-box;
   outline: none;
   transition: all 0.15s ease;
@@ -328,19 +309,19 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
-/* 胶囊按钮组（主题、字号等） */
+/* 胶囊按钮组（主题、字号） */
 .edgeever-segment-group {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
 .edgeever-segment-btn {
-  padding: 6px 12px;
-  font-size: 12.5px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 7px;
   border: 1px solid var(--ee-export-border);
-  background: var(--ee-export-bg-subtle);
+  background: var(--ee-export-bg-modal);
   color: var(--ee-export-text);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -357,25 +338,25 @@
   border-color: var(--ee-export-primary);
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.25);
 }
 
-/* 复选框组 */
+/* 高级复选开关 */
 .edgeever-checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--ee-export-bg-subtle);
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 10px;
+  border-radius: 9px;
 }
 
 .edgeever-checkbox-label {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 12px;
   cursor: pointer;
   user-select: none;
   color: var(--ee-export-text);
@@ -383,69 +364,26 @@
 
 .edgeever-checkbox-label input[type="checkbox"] {
   accent-color: var(--ee-export-primary);
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   border-radius: 4px;
   cursor: pointer;
 }
 
-/* 代码或命令预览框 */
-.edgeever-preview-box {
-  background: var(--ee-export-bg-subtle);
-  border: 1px solid var(--ee-export-border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-family: SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ee-export-text);
-  max-height: 90px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-/* 底部操作栏 */
-.edgeever-export-modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 24px;
+/* 左侧底部快捷按钮 */
+.edgeever-export-sidebar-footer {
+  padding: 14px 18px;
   border-top: 1px solid var(--ee-export-border);
   background: var(--ee-export-bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-.edgeever-export-status-info {
+.edgeever-btn-row {
   display: flex;
-  align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: var(--ee-export-text-muted);
-}
-
-.edgeever-export-status-info .status-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--ee-export-border);
-  border-top-color: var(--ee-export-primary);
-  border-radius: 50%;
-  animation: eeSpin 0.7s linear infinite;
-  display: none;
-}
-
-.edgeever-export-status-info.is-busy .status-spinner {
-  display: block;
-}
-
-@keyframes eeSpin {
-  to { transform: rotate(360deg); }
-}
-
-.edgeever-export-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .edgeever-btn {
@@ -453,15 +391,19 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  font-size: 13.5px;
+  padding: 9px 14px;
+  font-size: 13px;
   font-weight: 550;
-  border-radius: 9px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.16s ease;
   user-select: none;
   border: none;
   line-height: 1.2;
+}
+
+.edgeever-btn-flex {
+  flex: 1;
 }
 
 .edgeever-btn-secondary {
@@ -485,18 +427,190 @@
   transform: translateY(-1px);
 }
 
-.edgeever-btn-primary:active {
-  background: var(--ee-export-primary-active);
-  transform: translateY(0);
-}
-
 .edgeever-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* 针对打印与 PDF 专用的页面样式 */
+/* ==================== 右侧：真实所见即所得排版预览区 ==================== */
+.edgeever-export-preview-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #eef2f6;
+  overflow: hidden;
+  position: relative;
+}
+
+.dark .edgeever-export-preview-pane {
+  background: #0f1218;
+}
+
+.edgeever-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: var(--ee-export-bg-modal);
+  border-bottom: 1px solid var(--ee-export-border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.preview-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ee-export-bg-subtle);
+  border: 1px solid var(--ee-export-border);
+  color: var(--ee-export-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 预览可滚动视口 */
+.edgeever-preview-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+/* 纸张容器 */
+.edgeever-live-preview-paper {
+  width: 100%;
+  max-width: 680px;
+  min-height: 100%;
+  background: #ffffff;
+  color: #1f2328;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 36px 32px 60px 32px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  line-height: 1.7;
+}
+
+/* 纸张内部排版元素 */
+.edgeever-live-preview-paper .preview-title {
+  font-size: 2em;
+  font-weight: 750;
+  margin: 0 0 12px 0;
+  line-height: 1.25;
+}
+
+.edgeever-live-preview-paper .preview-meta {
+  font-size: 0.85em;
+  color: var(--ee-export-text-muted);
+  border-bottom: 1px solid var(--ee-export-border);
+  padding-bottom: 14px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.edgeever-live-preview-paper h1,
+.edgeever-live-preview-paper h2,
+.edgeever-live-preview-paper h3 {
+  font-weight: 650;
+  line-height: 1.35;
+  margin-top: 1.5em;
+  margin-bottom: 0.6em;
+}
+
+.edgeever-live-preview-paper h1 { font-size: 1.65em; border-bottom: 1px solid var(--ee-export-border); padding-bottom: 0.3em; }
+.edgeever-live-preview-paper h2 { font-size: 1.35em; border-bottom: 1px solid var(--ee-export-border); padding-bottom: 0.25em; }
+.edgeever-live-preview-paper h3 { font-size: 1.15em; }
+
+.edgeever-live-preview-paper p {
+  margin: 0.8em 0;
+}
+
+.edgeever-live-preview-paper img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 1.2em 0;
+  display: block;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.edgeever-live-preview-paper table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 0.9em;
+}
+
+.edgeever-live-preview-paper th,
+.edgeever-live-preview-paper td {
+  border: 1px solid var(--ee-export-border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.edgeever-live-preview-paper th {
+  background: var(--ee-export-bg-subtle);
+  font-weight: 600;
+}
+
+.edgeever-live-preview-paper blockquote {
+  margin: 1.2em 0;
+  padding: 8px 14px;
+  border-left: 4px solid var(--ee-export-primary);
+  background: var(--ee-export-bg-subtle);
+  border-radius: 0 6px 6px 0;
+}
+
+.edgeever-live-preview-paper pre {
+  margin: 1.2em 0;
+  padding: 12px 14px;
+  background: var(--ee-export-bg-subtle);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86em;
+  line-height: 1.5;
+}
+
+.edgeever-live-preview-paper code {
+  font-family: SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.edgeever-live-preview-paper hr {
+  border: none;
+  border-top: 1px solid var(--ee-export-border);
+  margin: 1.8em 0;
+}
+
+/* 针对纯文本模式（Markdown / Pandoc）的代码预览 */
+.edgeever-raw-preview-text {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--ee-export-text);
+  background: var(--ee-export-bg-modal);
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 720px;
+  box-sizing: border-box;
+}
+
+/* 打印与 PDF 专用的页面样式 */
 @media print {
   body {
     background: #ffffff !important;

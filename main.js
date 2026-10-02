@@ -1,7 +1,7 @@
 /**
  * EdgeEver Enhancing Export Plugin
  * 专业级多格式增强导出插件 (Inspired by obsidian-enhancing-export)
- * 深度适配 EdgeEver 笔记系统，提供独立离线 HTML、Word (.docx)、纯净与博客 Markdown、高保真 PDF、长图卡片与 Pandoc 命令行扩展。
+ * 深度适配 EdgeEver 笔记系统，提供真实文档所见即所得排版预览、全量图片 Base64 内嵌、Word (.docx)、独立 HTML、纯净与博客 Markdown、高保真 PDF 打印及 Pandoc 扩展。
  */
 
 // ==================== 1. 内置独立排版主题样式库 ====================
@@ -30,7 +30,7 @@ const THEMES = {
     tableHeaderBg: "#161b22",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
   },
-  "academic": {
+  academic: {
     name: "学术论文风",
     bg: "#fcfbf7",
     text: "#222222",
@@ -42,7 +42,7 @@ const THEMES = {
     tableHeaderBg: "#eee9de",
     fontFamily: '"Times New Roman", "Songti SC", "SimSun", Georgia, serif',
   },
-  "editorial": {
+  editorial: {
     name: "优雅杂志风",
     bg: "#faf7f2",
     text: "#2c2a29",
@@ -64,11 +64,148 @@ const THEMES = {
     accent: "#059669",
     blockquoteBorder: "#10b981",
     tableHeaderBg: "#f3f4f6",
-    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
   },
 };
 
-// ==================== 2. 高保真 Markdown 解析与渲染引擎 ====================
+// ==================== 2. 图片安全提取与 Base64 转换器 ====================
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function resolveImageToDataUrl(src, context) {
+  if (!src) return "";
+  const trimmed = src.trim();
+
+  // 1. 如果本身已经是 base64 data url，直接返回
+  if (trimmed.startsWith("data:")) {
+    return trimmed;
+  }
+
+  // 2. 检查是否为 EdgeEver 内部资源引用 (res_xxx)
+  // 支持格式：/api/v1/resources/res_xxx/blob, /api/v1/resources/res_xxx, resource:res_xxx, res_xxx
+  const resMatch = trimmed.match(/(res_[a-f0-9]{24,40})/);
+  if (resMatch) {
+    const resId = resMatch[1];
+    // A. 尝试通过 context.resources.read 读取
+    if (context.resources && typeof context.resources.read === "function") {
+      try {
+        const blob = await context.resources.read(resId);
+        if (blob) {
+          const b64 = await blobToBase64(blob);
+          if (b64 && b64.startsWith("data:")) return b64;
+        }
+      } catch (e) {
+        console.warn(`[Enhancing Export] resources.read failed for ${resId}:`, e);
+      }
+    }
+
+    // B. 从当前页面的活动编辑器 DOM 寻找已经加载的 img 元素
+    try {
+      const domImgs = document.querySelectorAll("img");
+      for (const img of domImgs) {
+        if (img.src && (img.src.includes(resId) || img.getAttribute("src")?.includes(resId))) {
+          if (img.complete && img.naturalWidth > 0) {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = canvas.toDataURL("image/png");
+            if (dataUrl && dataUrl.startsWith("data:")) return dataUrl;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Enhancing Export] DOM image extraction failed for ${resId}:`, e);
+    }
+
+    // C. 相对路径补全为完整绝对 URL，避免在本地成为 broken file:// 路径
+    if (trimmed.startsWith("/")) {
+      const baseUrl =
+        window.location.origin && window.location.origin !== "null" && window.location.origin !== "file://"
+          ? window.location.origin
+          : "https://edgeever.zyh-cjs.workers.dev";
+      return `${baseUrl}${trimmed}`;
+    }
+  }
+
+  // 3. 外部网络图片 (http:// 或 https://)
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      // 尝试匹配活动 DOM 中已下载好的跨域/缓存图片
+      const domImgs = document.querySelectorAll("img");
+      for (const img of domImgs) {
+        if (img.src === trimmed || img.getAttribute("src") === trimmed) {
+          if (img.complete && img.naturalWidth > 0) {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0);
+              const dataUrl = canvas.toDataURL("image/png");
+              if (dataUrl && dataUrl.startsWith("data:")) return dataUrl;
+            } catch (corsErr) {
+              // 跨域受限则保留完整原 URL
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    return trimmed;
+  }
+
+  // 4. 其他相对路径补全
+  if (trimmed.startsWith("/")) {
+    const baseUrl =
+      window.location.origin && window.location.origin !== "null" && window.location.origin !== "file://"
+        ? window.location.origin
+        : "https://edgeever.zyh-cjs.workers.dev";
+    return `${baseUrl}${trimmed}`;
+  }
+
+  return trimmed;
+}
+
+async function resolveAllImagesInMarkdown(rawMarkdown, context) {
+  if (!rawMarkdown) return "";
+  let result = rawMarkdown;
+
+  // 1. 匹配所有 Markdown 图片语法: ![alt](url)
+  const mdImgMatches = [...rawMarkdown.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
+  for (const m of mdImgMatches) {
+    const fullMatch = m[0];
+    const alt = m[1];
+    const rawSrc = m[2];
+    const resolved = await resolveImageToDataUrl(rawSrc, context);
+    if (resolved && resolved !== rawSrc) {
+      result = result.split(fullMatch).join(`![${alt}](${resolved})`);
+    }
+  }
+
+  // 2. 匹配所有 HTML <img> 标签语法: <img src="..." ...>
+  const htmlImgMatches = [...rawMarkdown.matchAll(/<img\s+[^>]*src=["']([^"']+)["'][^>]*>/gi)];
+  for (const m of htmlImgMatches) {
+    const fullTag = m[0];
+    const rawSrc = m[1];
+    const resolved = await resolveImageToDataUrl(rawSrc, context);
+    if (resolved && resolved !== rawSrc) {
+      const newTag = fullTag.replace(rawSrc, resolved);
+      result = result.split(fullTag).join(newTag);
+    }
+  }
+
+  return result;
+}
+
+// ==================== 3. 高保真 Markdown 解析与 HTML 渲染引擎 ====================
 function escapeHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
@@ -78,7 +215,7 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
-function renderMarkdownToHtml(markdown, options = {}) {
+function renderMarkdownToHtml(markdown) {
   if (!markdown) return "";
 
   let md = markdown.replace(/\r\n/g, "\n");
@@ -91,7 +228,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
     return placeholder;
   });
 
-  // 2. 抽取并保护数学公式
+  // 2. 抽取并保护独立与行内数学公式
   const mathBlocks = [];
   md = md.replace(/\$\$([\s\S]*?)\$\$/g, (_m, math) => {
     const placeholder = `__EE_MATH_BLOCK_${mathBlocks.length}__`;
@@ -106,7 +243,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
     return placeholder;
   });
 
-  // 3. 行级与块级解析
+  // 3. 逐行块级解析
   const lines = md.split("\n");
   const htmlParts = [];
   let inList = false;
@@ -133,7 +270,6 @@ function renderMarkdownToHtml(markdown, options = {}) {
     if (inTable) {
       if (tableRows.length > 0) {
         let tableHtml = '<div class="ee-table-wrapper"><table>';
-        // 第一行为表头
         const header = tableRows[0];
         tableHtml += "<thead><tr>";
         header.forEach((c) => (tableHtml += `<th>${renderInline(c)}</th>`));
@@ -155,13 +291,13 @@ function renderMarkdownToHtml(markdown, options = {}) {
   function renderInline(text) {
     let s = escapeHtml(text);
 
-    // 行内数学公式占位符还原
+    // 数学公式占位符还原
     s = s.replace(/__EE_MATH_INLINE_(\d+)__/g, (_m, idx) => {
       const code = mathInlines[Number(idx)] || "";
-      return `<span class="ee-math-inline" data-tex="${escapeHtml(code)}">${escapeHtml(code)}</span>`;
+      return `<span class="ee-math-inline">${escapeHtml(code)}</span>`;
     });
 
-    // 图片
+    // 图片渲染
     s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
       return `<img src="${src}" alt="${alt}" class="ee-img" loading="lazy" />`;
     });
@@ -188,8 +324,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
     s = s.replace(/~~([^~]+)~~/g, "<del>$1</del>");
     // 高亮
     s = s.replace(/==([^=]+)==/g, "<mark>$1</mark>");
-
-    // 标签 (#tag)
+    // 标签
     s = s.replace(/(?:^|\s)#([a-zA-Z0-9_\u4e00-\u9fa5]+)/g, ' <span class="ee-tag">#$1</span>');
 
     return s;
@@ -199,7 +334,6 @@ function renderMarkdownToHtml(markdown, options = {}) {
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
 
-    // 检查空行
     if (!trimmed) {
       flushList();
       flushBlockquote();
@@ -207,7 +341,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
       continue;
     }
 
-    // 表格分隔线过滤 (如 |---|---|)
+    // 过滤表头对齐分隔线 (如 |---|---|)
     if (/^\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?$/.test(trimmed)) {
       continue;
     }
@@ -239,7 +373,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
       continue;
     }
 
-    // 分割线
+    // 水平分割线
     if (/^(\*{3,}|-{3,}|_{3,})$/.test(trimmed)) {
       flushList();
       flushBlockquote();
@@ -261,7 +395,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
       flushBlockquote();
     }
 
-    // 任务列表
+    // 任务列表 Checkbox
     const taskMatch = trimmed.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/);
     if (taskMatch) {
       if (!inList || listType !== "ul") {
@@ -307,7 +441,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
 
     flushList();
 
-    // 普通段落或占位符
+    // 代码块或公式占位符
     if (trimmed.startsWith("__EE_CODE_BLOCK_") && trimmed.endsWith("__")) {
       htmlParts.push(trimmed);
       continue;
@@ -327,11 +461,13 @@ function renderMarkdownToHtml(markdown, options = {}) {
 
   let finalHtml = htmlParts.join("\n");
 
-  // 4. 还原代码块
+  // 还原代码块
   finalHtml = finalHtml.replace(/__EE_CODE_BLOCK_(\d+)__/g, (_m, idx) => {
     const item = codeBlocks[Number(idx)];
     if (!item) return "";
-    const langBadge = item.lang ? `<div class="ee-code-header"><span class="ee-code-lang">${escapeHtml(item.lang)}</span></div>` : "";
+    const langBadge = item.lang
+      ? `<div class="ee-code-header"><span class="ee-code-lang">${escapeHtml(item.lang)}</span></div>`
+      : "";
     return `
       <div class="ee-code-block-wrapper">
         ${langBadge}
@@ -340,7 +476,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
     `;
   });
 
-  // 5. 还原独立块级数学公式
+  // 还原独立数学公式
   finalHtml = finalHtml.replace(/__EE_MATH_BLOCK_(\d+)__/g, (_m, idx) => {
     const math = mathBlocks[Number(idx)] || "";
     return `
@@ -353,7 +489,7 @@ function renderMarkdownToHtml(markdown, options = {}) {
   return finalHtml;
 }
 
-// ==================== 3. 独立 HTML 导出生成器 ====================
+// ==================== 4. 独立 HTML 导出生成器 ====================
 function generateStandaloneHtml(article, themeConfig, options = {}) {
   const { title, contentHtml, createdAt, updatedAt, tags, notebook } = article;
   const fontSize = options.fontSize || 15;
@@ -542,7 +678,7 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
 </html>`;
 }
 
-// ==================== 4. 博客 Markdown (Hugo/Hexo) 导出生成器 ====================
+// ==================== 5. 博客 Markdown (Hugo/Hexo) 导出生成器 ====================
 function generateHugoMarkdown(article, rawMarkdown) {
   const { title, tags, createdAt, updatedAt } = article;
   const nowStr = new Date().toISOString();
@@ -551,7 +687,6 @@ function generateHugoMarkdown(article, rawMarkdown) {
 
   const tagList = tags && tags.length > 0 ? tags.map((t) => JSON.stringify(t)).join(", ") : "";
 
-  // 构造标准 Frontmatter
   const frontmatter = `---
 title: ${JSON.stringify(title || "无标题笔记")}
 date: ${dateStr}
@@ -563,14 +698,13 @@ categories: []
 
 `;
 
-  // 移除原文开头可能已经存在的 Frontmatter 避免重复
   const cleanContent = rawMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
   return frontmatter + cleanContent;
 }
 
-// ==================== 5. Word (.docx / MHTML-Word) 导出生成器 ====================
+// ==================== 6. Word (.docx / MHTML-Word) 导出生成器 ====================
 function generateWordDocument(article, htmlContent) {
-  const { title, notebook, updatedAt } = article;
+  const { title, notebook } = article;
   return `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
@@ -638,7 +772,7 @@ function generateWordDocument(article, htmlContent) {
 </html>`;
 }
 
-// ==================== 6. 文件下载与剪贴板工具 ====================
+// ==================== 7. 文件下载与剪贴板工具 ====================
 function downloadFile(content, fileName, mimeType = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -664,7 +798,6 @@ async function copyToClipboard(text, context) {
     console.warn("Clipboard API writeText failed:", e);
   }
 
-  // Fallback
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.style.position = "fixed";
@@ -683,7 +816,7 @@ async function copyToClipboard(text, context) {
   }
 }
 
-// ==================== 7. 导出格式预设定义 (参考 enhancing-export) ====================
+// ==================== 8. 导出格式预设定义 (参考 enhancing-export) ====================
 const EXPORT_FORMATS = [
   {
     id: "html",
@@ -691,7 +824,7 @@ const EXPORT_FORMATS = [
     ext: ".html",
     engine: "builtin",
     icon: "🌐",
-    desc: "将样式、排版与所有本地图片全部内嵌的独立单文件 HTML，离线双击即可完美呈现。",
+    desc: "将样式、排版与所有本地图片全部内嵌 Base64，离线随处双击完美呈现。",
     mime: "text/html;charset=utf-8",
   },
   {
@@ -700,7 +833,7 @@ const EXPORT_FORMATS = [
     ext: ".docx",
     engine: "builtin",
     icon: "📄",
-    desc: "高保真 Word 规范文档，支持表格、排版样式与内联图片，Microsoft Word / WPS 无缝打开。",
+    desc: "高保真 Word 规范文档，支持表格与内嵌图片，Microsoft Word / WPS 无缝打开。",
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   },
   {
@@ -709,7 +842,7 @@ const EXPORT_FORMATS = [
     ext: ".pdf",
     engine: "builtin",
     icon: "🖨️",
-    desc: "针对 A4 纸张优化的排版打印视图，支持自由调整字号边距，直接打印或保存为高清 PDF。",
+    desc: "针对 A4 纸张排版优化，支持自选字号与主题，直接打印或另存为高清 PDF。",
     mime: "application/pdf",
   },
   {
@@ -718,7 +851,7 @@ const EXPORT_FORMATS = [
     ext: ".md",
     engine: "builtin",
     icon: "📝",
-    desc: "符合通用 CommonMark 规范的纯净 Markdown 文件，适合迁移或在其他编辑器中编辑。",
+    desc: "符合通用 CommonMark 规范的 Markdown 文本，方便在任何外部工具中编辑。",
     mime: "text/markdown;charset=utf-8",
   },
   {
@@ -736,12 +869,12 @@ const EXPORT_FORMATS = [
     ext: ".epub",
     engine: "pandoc",
     icon: "⚙️",
-    desc: "利用系统 Pandoc 支持导出为 EPUB、LaTeX (.tex)、Typst、PowerPoint (.pptx) 等高级格式。",
+    desc: "利用 Pandoc 导出为 EPUB、LaTeX (.tex)、Typst、PowerPoint (.pptx) 等高级格式。",
     mime: "text/plain",
   },
 ];
 
-// ==================== 8. 核心插件生命周期 ====================
+// ==================== 9. 核心插件生命周期 ====================
 export default {
   activate(context) {
     let settings = {
@@ -778,7 +911,7 @@ export default {
 
     loadSettings();
 
-    // 解析当前笔记完整信息
+    // 获取并解析当前笔记
     async function getCurrentArticle() {
       let doc = null;
       try {
@@ -799,35 +932,19 @@ export default {
       const createdAt = note?.createdAt ? new Date(note.createdAt).toLocaleString() : "";
       const updatedAt = note?.updatedAt ? new Date(note.updatedAt).toLocaleString() : "";
 
-      // 提取资源引用并尝试转换 Base64
-      if (settings.embedImagesBase64 && doc && doc.noteId) {
-        try {
-          const resources = await context.resources.list(doc.noteId);
-          if (resources && resources.length > 0) {
-            for (const res of resources) {
-              const resTag = `resource:${res.id}`;
-              if (rawMarkdown.includes(resTag) || rawMarkdown.includes(res.id)) {
-                try {
-                  const blob = await context.resources.read(res.id);
-                  if (blob) {
-                    const base64 = await blobToBase64(blob);
-                    rawMarkdown = rawMarkdown.split(resTag).join(base64);
-                    rawMarkdown = rawMarkdown.split(res.id).join(base64);
-                  }
-                } catch (e) {}
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("[Enhancing Export] resolve resources error:", e);
-        }
+      // 提取并彻底解析全部图片为 Base64 / 完整可用 URL
+      let markdownWithImages = rawMarkdown;
+      try {
+        markdownWithImages = await resolveAllImagesInMarkdown(rawMarkdown, context);
+      } catch (err) {
+        console.warn("[Enhancing Export] resolveAllImagesInMarkdown error:", err);
       }
 
-      const contentHtml = renderMarkdownToHtml(rawMarkdown);
+      const contentHtml = renderMarkdownToHtml(markdownWithImages);
 
       return {
         title,
-        rawMarkdown,
+        rawMarkdown: markdownWithImages,
         contentHtml,
         tags,
         notebook,
@@ -836,16 +953,7 @@ export default {
       };
     }
 
-    function blobToBase64(blob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    // ==================== 9. 导出交互向导弹窗 (Modal) ====================
+    // ==================== 10. 导出交互向导弹窗 (双栏带实时所见即所得排版预览) ====================
     async function openExportModal() {
       // 移除可能存在的旧弹窗
       document.querySelectorAll(".edgeever-export-modal-backdrop").forEach((el) => el.remove());
@@ -859,8 +967,6 @@ export default {
       let selectedFormat = settings.defaultFormat;
       let selectedTheme = settings.defaultTheme;
       let selectedFontSize = settings.defaultFontSize;
-      let embedImages = settings.embedImagesBase64;
-      let includeFrontmatter = settings.includeFrontmatter;
       let candidateFileName = (article.title || "Note").replace(/[\\/:*?"<>|]/g, "_");
 
       const backdrop = document.createElement("div");
@@ -868,85 +974,102 @@ export default {
 
       backdrop.innerHTML = `
         <div class="edgeever-export-modal">
+          <!-- 弹窗顶栏 -->
           <div class="edgeever-export-modal-header">
             <div class="edgeever-export-modal-title-wrap">
               <div class="edgeever-export-modal-icon">📤</div>
               <div>
                 <h3 class="edgeever-export-modal-title">增强导出 (Enhancing Export)</h3>
-                <div class="edgeever-export-modal-subtitle">选择目标格式并定制专属排版参数</div>
+                <div class="edgeever-export-modal-subtitle">左侧调整排版参数，右侧实时所见即所得预览</div>
               </div>
             </div>
             <button type="button" class="edgeever-export-modal-close-btn" title="关闭 (Esc)">✕</button>
           </div>
 
+          <!-- 双栏主体 -->
           <div class="edgeever-export-modal-body">
-            <!-- 左侧：格式选择卡片 -->
-            <div class="edgeever-export-formats-pane">
-              <div class="edgeever-export-section-title">选择导出格式</div>
-              <div class="edgeever-export-cards-list"></div>
-            </div>
+            <!-- 左侧控制栏 -->
+            <div class="edgeever-export-sidebar">
+              <div class="edgeever-export-sidebar-scroll">
+                <!-- 格式选择 -->
+                <div class="edgeever-export-section-title">选择目标格式</div>
+                <div class="edgeever-export-cards-list"></div>
 
-            <!-- 右侧：选项与微调 -->
-            <div class="edgeever-export-options-pane">
-              <div class="edgeever-form-group">
-                <label class="edgeever-form-label">
-                  导出文件名
-                  <span class="edgeever-form-hint" id="ee-ext-hint">.html</span>
-                </label>
-                <input type="text" class="edgeever-input-text" id="ee-filename-input" value="${escapeHtml(candidateFileName)}" />
-              </div>
+                <!-- 文件名 -->
+                <div class="edgeever-form-group">
+                  <label class="edgeever-form-label">
+                    导出文件名
+                    <span class="edgeever-form-hint" id="ee-ext-hint">.html</span>
+                  </label>
+                  <input type="text" class="edgeever-input-text" id="ee-filename-input" value="${escapeHtml(candidateFileName)}" />
+                </div>
 
-              <!-- 主题与排版 -->
-              <div class="edgeever-form-group" id="ee-theme-group">
-                <label class="edgeever-form-label">排版设计风格</label>
-                <div class="edgeever-segment-group" id="ee-theme-segments"></div>
-              </div>
+                <!-- 排版风格主题 -->
+                <div class="edgeever-form-group" id="ee-theme-group">
+                  <label class="edgeever-form-label">排版设计风格</label>
+                  <div class="edgeever-segment-group" id="ee-theme-segments"></div>
+                </div>
 
-              <!-- 字号设置 -->
-              <div class="edgeever-form-group" id="ee-fontsize-group">
-                <label class="edgeever-form-label">正文字号大小</label>
-                <div class="edgeever-segment-group" id="ee-fontsize-segments">
-                  <button type="button" class="edgeever-segment-btn" data-size="13">13px (紧凑)</button>
-                  <button type="button" class="edgeever-segment-btn" data-size="14">14px</button>
-                  <button type="button" class="edgeever-segment-btn" data-size="15">15px (舒适)</button>
-                  <button type="button" class="edgeever-segment-btn" data-size="16">16px</button>
-                  <button type="button" class="edgeever-segment-btn" data-size="18">18px (清晰)</button>
+                <!-- 正文字号 -->
+                <div class="edgeever-form-group" id="ee-fontsize-group">
+                  <label class="edgeever-form-label">正文字号大小</label>
+                  <div class="edgeever-segment-group" id="ee-fontsize-segments">
+                    <button type="button" class="edgeever-segment-btn" data-size="13">13px</button>
+                    <button type="button" class="edgeever-segment-btn" data-size="14">14px</button>
+                    <button type="button" class="edgeever-segment-btn" data-size="15">15px</button>
+                    <button type="button" class="edgeever-segment-btn" data-size="16">16px</button>
+                    <button type="button" class="edgeever-segment-btn" data-size="18">18px</button>
+                  </div>
+                </div>
+
+                <!-- 高级选项 -->
+                <div class="edgeever-form-group">
+                  <label class="edgeever-form-label">高级选项</label>
+                  <div class="edgeever-checkbox-group">
+                    <label class="edgeever-checkbox-label">
+                      <input type="checkbox" id="ee-opt-embed-img" ${settings.embedImagesBase64 ? "checked" : ""} />
+                      <span>自动内嵌本地图片 Base64 (离线不丢图)</span>
+                    </label>
+                    <label class="edgeever-checkbox-label">
+                      <input type="checkbox" id="ee-opt-frontmatter" ${settings.includeFrontmatter ? "checked" : ""} />
+                      <span>包含文章元数据 (Frontmatter / 标签)</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <!-- 特性勾选 -->
-              <div class="edgeever-form-group">
-                <label class="edgeever-form-label">高级选项</label>
-                <div class="edgeever-checkbox-group">
-                  <label class="edgeever-checkbox-label">
-                    <input type="checkbox" id="ee-opt-embed-img" ${embedImages ? "checked" : ""} />
-                    <span>自动将所有本地图片转为 Base64 嵌入（离线独立打开不丢图）</span>
-                  </label>
-                  <label class="edgeever-checkbox-label">
-                    <input type="checkbox" id="ee-opt-frontmatter" ${includeFrontmatter ? "checked" : ""} />
-                    <span>导出时包含文章元数据 (YAML Frontmatter / 标签 / 时间)</span>
-                  </label>
+              <!-- 左侧底部操作栏 -->
+              <div class="edgeever-export-sidebar-footer">
+                <div class="edgeever-btn-row">
+                  <button type="button" class="edgeever-btn edgeever-btn-secondary edgeever-btn-flex" id="ee-btn-copy">📋 复制内容</button>
+                  <button type="button" class="edgeever-btn edgeever-btn-primary edgeever-btn-flex" id="ee-btn-export">📥 立即导出并保存</button>
                 </div>
               </div>
+            </div>
 
-              <!-- 实时命令 / 说明预览 -->
-              <div class="edgeever-form-group">
-                <label class="edgeever-form-label">导出概要说明</label>
-                <div class="edgeever-preview-box" id="ee-preview-box">正在就绪...</div>
+            <!-- 右侧：真实所见即所得排版预览区 -->
+            <div class="edgeever-export-preview-pane">
+              <div class="edgeever-preview-header">
+                <span style="font-weight: 600;">📄 实时排版预览</span>
+                <div class="preview-badge-group">
+                  <span class="preview-pill" id="ee-preview-theme-pill">GitHub 浅色经典</span>
+                  <span class="preview-pill" id="ee-preview-size-pill">15px</span>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <!-- 底部操作栏 -->
-          <div class="edgeever-export-modal-footer">
-            <div class="edgeever-export-status-info" id="ee-status-info">
-              <span class="status-spinner"></span>
-              <span class="status-text">就绪</span>
-            </div>
-            <div class="edgeever-export-actions">
-              <button type="button" class="edgeever-btn edgeever-btn-secondary" id="ee-btn-cancel">取消</button>
-              <button type="button" class="edgeever-btn edgeever-btn-secondary" id="ee-btn-copy">📋 复制内容</button>
-              <button type="button" class="edgeever-btn edgeever-btn-primary" id="ee-btn-export">📥 立即导出并保存</button>
+              <div class="edgeever-preview-viewport">
+                <!-- 真实纸张画布 -->
+                <div class="edgeever-live-preview-paper" id="ee-live-paper">
+                  <h1 class="preview-title">${escapeHtml(article.title || "无标题笔记")}</h1>
+                  <div class="preview-meta">
+                    ${article.notebook ? `<span>📁 ${escapeHtml(article.notebook)}</span>` : ""}
+                    ${article.updatedAt ? `<span>🕒 ${escapeHtml(article.updatedAt)}</span>` : ""}
+                    ${article.tags && article.tags.length > 0 ? `<span>🏷️ ${article.tags.map((t) => `#${escapeHtml(t)}`).join(" ")}</span>` : ""}
+                  </div>
+                  <div class="preview-content-body">${article.contentHtml}</div>
+                </div>
+                <!-- 纯文本模式预览 -->
+                <div class="edgeever-raw-preview-text" id="ee-raw-preview" style="display: none;"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -954,18 +1077,18 @@ export default {
 
       document.body.appendChild(backdrop);
 
-      // DOM 元素引用
+      // DOM 引用
       const cardsList = backdrop.querySelector(".edgeever-export-cards-list");
       const themeSegments = backdrop.querySelector("#ee-theme-segments");
       const fontSizeSegments = backdrop.querySelector("#ee-fontsize-segments");
       const fileNameInput = backdrop.querySelector("#ee-filename-input");
       const extHint = backdrop.querySelector("#ee-ext-hint");
-      const previewBox = backdrop.querySelector("#ee-preview-box");
-      const statusInfo = backdrop.querySelector("#ee-status-info");
-      const statusText = statusInfo.querySelector(".status-text");
+      const previewThemePill = backdrop.querySelector("#ee-preview-theme-pill");
+      const previewSizePill = backdrop.querySelector("#ee-preview-size-pill");
+      const livePaper = backdrop.querySelector("#ee-live-paper");
+      const rawPreview = backdrop.querySelector("#ee-raw-preview");
       const btnExport = backdrop.querySelector("#ee-btn-export");
       const btnCopy = backdrop.querySelector("#ee-btn-copy");
-      const btnCancel = backdrop.querySelector("#ee-btn-cancel");
       const btnClose = backdrop.querySelector(".edgeever-export-modal-close-btn");
 
       // 渲染格式卡片
@@ -981,9 +1104,6 @@ export default {
               <span class="format-card-ext">${escapeHtml(fmt.ext)}</span>
             </div>
             <div class="format-card-desc">${escapeHtml(fmt.desc)}</div>
-            <span class="format-card-badge ${fmt.engine === "builtin" ? "badge-builtin" : "badge-pandoc"}">
-              ${fmt.engine === "builtin" ? "内置引擎 (免配置)" : "Pandoc 引擎"}
-            </span>
           </div>
         `;
         card.onclick = () => {
@@ -995,7 +1115,7 @@ export default {
         cardsList.appendChild(card);
       });
 
-      // 渲染主题胶囊
+      // 渲染排版主题胶囊
       Object.entries(THEMES).forEach(([key, thm]) => {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -1011,7 +1131,7 @@ export default {
         themeSegments.appendChild(btn);
       });
 
-      // 字号胶囊事件
+      // 正文字号胶囊
       fontSizeSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
         if (btn.dataset.size === selectedFontSize) btn.classList.add("is-active");
         btn.onclick = () => {
@@ -1022,33 +1142,72 @@ export default {
         };
       });
 
+      // 核心：实时所见即所得更新函数
       function updateUiState() {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
+        const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
         extHint.textContent = fmtObj.ext;
 
-        const isHtml = selectedFormat === "html";
-        const isDocx = selectedFormat === "docx";
-        const isPdf = selectedFormat === "pdf";
-        const isPandoc = selectedFormat === "pandoc";
+        const isVisualFormat = selectedFormat === "html" || selectedFormat === "docx" || selectedFormat === "pdf";
 
-        // 主题与字号仅对 HTML / DOCX / PDF 导出开放
-        backdrop.querySelector("#ee-theme-group").style.display = isHtml || isDocx || isPdf ? "flex" : "none";
-        backdrop.querySelector("#ee-fontsize-group").style.display = isHtml || isDocx || isPdf ? "flex" : "none";
+        // 控制主题与字号选项显示
+        backdrop.querySelector("#ee-theme-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-fontsize-group").style.display = isVisualFormat ? "flex" : "none";
 
-        if (isPandoc) {
-          const sampleCmd = `${settings.pandocPath} "\${currentPath}" -s -o "\${outputPath}" -t epub`;
-          previewBox.textContent = `将调用的 Pandoc 指令模板：\n${sampleCmd}\n支持变量：\${currentPath}, \${outputPath}, \${outputDir}`;
-          btnCopy.textContent = "📋 复制转换指令";
-          btnExport.textContent = "📥 复制并执行导出";
-        } else if (isPdf) {
-          previewBox.textContent = `高保真打印模式：将根据 ${THEMES[selectedTheme].name} 及 ${selectedFontSize}px 字号调起高清排版打印窗口，支持直接保存为 PDF。`;
-          btnCopy.style.display = "none";
-          btnExport.textContent = "🖨️ 打开打印 / 保存 PDF";
+        previewThemePill.textContent = themeConfig.name;
+        previewSizePill.textContent = `${selectedFontSize}px`;
+
+        if (isVisualFormat) {
+          livePaper.style.display = "block";
+          rawPreview.style.display = "none";
+
+          // 实时将所选主题的色彩、背景、字体、代码块样式动态应用到右侧纸张画布
+          livePaper.style.backgroundColor = themeConfig.bg;
+          livePaper.style.color = themeConfig.text;
+          livePaper.style.fontFamily = themeConfig.fontFamily;
+          livePaper.style.fontSize = `${selectedFontSize}px`;
+
+          // 代码块与引用块样式联动
+          livePaper.querySelectorAll("pre").forEach((pre) => {
+            pre.style.backgroundColor = themeConfig.codeBg;
+            pre.style.borderColor = themeConfig.border;
+          });
+          livePaper.querySelectorAll("blockquote").forEach((bq) => {
+            bq.style.backgroundColor = themeConfig.codeBg;
+            bq.style.borderLeftColor = themeConfig.blockquoteBorder;
+            bq.style.color = themeConfig.muted;
+          });
+          livePaper.querySelectorAll("th, td").forEach((cell) => {
+            cell.style.borderColor = themeConfig.border;
+          });
+          livePaper.querySelectorAll("th").forEach((th) => {
+            th.style.backgroundColor = themeConfig.tableHeaderBg;
+          });
+          livePaper.querySelectorAll(".preview-meta").forEach((m) => {
+            m.style.borderColor = themeConfig.border;
+            m.style.color = themeConfig.muted;
+          });
+
+          if (selectedFormat === "pdf") {
+            btnExport.textContent = "🖨️ 打开打印 / 保存 PDF";
+          } else {
+            btnExport.textContent = "📥 立即导出并保存";
+          }
         } else {
-          btnCopy.style.display = "inline-flex";
-          btnCopy.textContent = "📋 复制内容";
-          btnExport.textContent = "📥 立即导出并保存";
-          previewBox.textContent = `目标格式：${fmtObj.name} (${fmtObj.ext})\n排版风格：${THEMES[selectedTheme].name}，正文字号：${selectedFontSize}px\n文件将直接打包下载到您的下载文件夹中。`;
+          // 纯文本预览模式 (Markdown, Hugo, Pandoc)
+          livePaper.style.display = "none";
+          rawPreview.style.display = "block";
+
+          if (selectedFormat === "hugo") {
+            rawPreview.textContent = generateHugoMarkdown(article, article.rawMarkdown);
+          } else if (selectedFormat === "pandoc") {
+            const baseName = (fileNameInput.value || article.title || "Note").trim();
+            rawPreview.textContent = `# Pandoc 转换执行指令 (在终端运行):\n${settings.pandocPath} "${baseName}.md" -s -o "${baseName}.epub" --metadata title="${article.title}"\n\n# 支持导出格式: epub, docx, pdf, tex, typst, pptx\n# 变量替换: \${currentPath}, \${outputPath}, \${outputDir}`;
+          } else {
+            rawPreview.textContent = article.rawMarkdown;
+          }
+
+          btnExport.textContent = selectedFormat === "pandoc" ? "📋 复制 Pandoc 命令行" : "📥 导出 Markdown 文件";
         }
       }
 
@@ -1057,7 +1216,6 @@ export default {
       // 关闭事件
       const closeModal = () => backdrop.remove();
       btnClose.onclick = closeModal;
-      btnCancel.onclick = closeModal;
       backdrop.onclick = (e) => {
         if (e.target === backdrop) closeModal();
       };
@@ -1070,7 +1228,7 @@ export default {
       };
       window.addEventListener("keydown", handleKeyDown);
 
-      // 执行复制
+      // 复制内容
       btnCopy.onclick = async () => {
         const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
         let textToCopy = "";
@@ -1079,6 +1237,8 @@ export default {
           textToCopy = generateStandaloneHtml(article, themeConfig, { fontSize: selectedFontSize });
         } else if (selectedFormat === "hugo") {
           textToCopy = generateHugoMarkdown(article, article.rawMarkdown);
+        } else if (selectedFormat === "docx") {
+          textToCopy = generateWordDocument(article, article.contentHtml);
         } else if (selectedFormat === "pandoc") {
           textToCopy = `${settings.pandocPath} "input.md" -s -o "output.epub"`;
         } else {
@@ -1088,15 +1248,13 @@ export default {
         await copyToClipboard(textToCopy, context);
       };
 
-      // 执行导出下载
+      // 导出下载
       btnExport.onclick = async () => {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
         const baseName = (fileNameInput.value || article.title || "Note").trim();
         const outputFileName = `${baseName}${fmtObj.ext}`;
         const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
 
-        statusInfo.classList.add("is-busy");
-        statusText.textContent = "正在处理与编译排版...";
         btnExport.disabled = true;
 
         try {
@@ -1117,7 +1275,7 @@ export default {
           } else if (selectedFormat === "docx") {
             const docxContent = generateWordDocument(article, article.contentHtml);
             downloadFile(docxContent, outputFileName, "application/msword;charset=utf-8");
-            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！可在 Word/WPS 中打开。`);
+            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！可在 Word/WPS 中直接打开。`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "pdf") {
             const printHtml = generateStandaloneHtml(article, themeConfig, { fontSize: selectedFontSize });
@@ -1138,22 +1296,19 @@ export default {
           } else if (selectedFormat === "pandoc") {
             const cmd = `${settings.pandocPath} "${baseName}.md" -s -o "${baseName}.epub"`;
             await copyToClipboard(cmd, context);
-            context.ui?.showNotice?.("已为您生成并复制 Pandoc 命令行指令！");
+            context.ui?.showNotice?.("已为您复制 Pandoc 终端执行命令！");
             closeModal();
           }
         } catch (err) {
           console.error("[Enhancing Export] export error:", err);
-          context.ui?.showNotice?.(`导出过程中发生异常: ${err.message || err}`);
+          context.ui?.showNotice?.(`导出异常: ${err.message || err}`);
         } finally {
-          statusInfo.classList.remove("is-busy");
-          statusText.textContent = "就绪";
           btnExport.disabled = false;
         }
       };
     }
 
-    // ==================== 10. 注册命令与顶部快捷入口 ====================
-    // 1. 注册核心命令
+    // ==================== 11. 注册核心命令与顶部快捷入口 ====================
     context.commands.register({
       id: "enhancing-export-open",
       title: "增强导出 (Enhancing Export)...",
@@ -1163,12 +1318,10 @@ export default {
       },
     });
 
-    // 2. 注入页面工具栏快捷按钮
     function injectToolbarButton() {
       if (!settings.showToolbarButton) return;
       if (document.querySelector(".edgeever-enhancing-export-trigger-btn")) return;
 
-      // 寻找 EdgeEver 编辑器顶部动作栏或右上角区域
       const targetHeader =
         document.querySelector(".edgeever-note-header-actions") ||
         document.querySelector(".edgeever-editor-toolbar") ||
@@ -1193,7 +1346,6 @@ export default {
       if (targetHeader) {
         targetHeader.insertBefore(btn, targetHeader.firstChild);
       } else {
-        // 如果未找到固定动作栏，以现代优雅悬浮入口方式固定在右上角
         btn.style.position = "fixed";
         btn.style.top = "12px";
         btn.style.right = "80px";
@@ -1203,7 +1355,6 @@ export default {
       }
     }
 
-    // 监听 DOM 树变化以保证按钮在切笔记后不丢失
     let timer = null;
     const observer = new MutationObserver(() => {
       clearTimeout(timer);
@@ -1213,14 +1364,12 @@ export default {
 
     setTimeout(injectToolbarButton, 300);
 
-    // 监听设置变化
     context.events.on("settings.changed", async () => {
       await loadSettings();
       document.querySelectorAll(".edgeever-enhancing-export-trigger-btn").forEach((b) => b.remove());
       injectToolbarButton();
     });
 
-    // 卸载与清理
     return () => {
       observer.disconnect();
       document.querySelectorAll(".edgeever-enhancing-export-trigger-btn").forEach((b) => b.remove());
