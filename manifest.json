@@ -1,0 +1,94 @@
+{
+  "type": "plugin",
+  "id": "org.edgeever.plugins.enhancing-export",
+  "name": "Enhancing Export",
+  "version": "1.0.0",
+  "apiVersion": "2",
+  "settingsUi": "host",
+  "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML, Markdown (Standard & Hugo), Word (.docx), PDF, and Pandoc formats with customized styling and typography.",
+  "locales": {
+    "zh-CN": {
+      "name": "增强导出 (Enhancing Export)",
+      "description": "参考 obsidian-enhancing-export 打造的专业级多格式增强导出插件。支持将 EdgeEver 笔记导出为带独立完整样式的 HTML、纯净与博客 Markdown (Hugo/Hexo)、Word 文档 (.docx)、可定制边距与字号的高保真 PDF 以及全景长图卡片，并支持 Pandoc 模板命令扩展。"
+    }
+  },
+  "author": "zyhcs",
+  "entry": "./main.js",
+  "platforms": ["web", "desktop"],
+  "permissions": [
+    "notes:read",
+    "resources:read",
+    "editor:read",
+    "ui:notices",
+    "ui:commands",
+    "storage"
+  ],
+  "settings": {
+    "fields": [
+      {
+        "key": "default_format",
+        "type": "select",
+        "label": "默认导出格式",
+        "default": "html",
+        "options": [
+          { "value": "html", "label": "独立离线网页 (.html)" },
+          { "value": "md", "label": "纯净标准 Markdown (.md)" },
+          { "value": "hugo", "label": "博客 Markdown (Hugo/Hexo)" },
+          { "value": "docx", "label": "Word 文档 (.docx)" },
+          { "value": "pdf", "label": "高保真排版打印 / PDF" },
+          { "value": "png", "label": "长图分享卡片 (.png)" }
+        ]
+      },
+      {
+        "key": "default_theme",
+        "type": "select",
+        "label": "默认排版风格主题",
+        "default": "github-light",
+        "options": [
+          { "value": "github-light", "label": "GitHub 浅色经典 (GitHub Light)" },
+          { "value": "modern-dark", "label": "暗夜极客黑 (Modern Dark)" },
+          { "value": "academic", "label": "学术论文风 (Academic Paper)" },
+          { "value": "editorial", "label": "优雅杂志风 (Editorial Serif)" },
+          { "value": "clean-white", "label": "极简纯白风 (Clean Minimal)" }
+        ]
+      },
+      {
+        "key": "default_font_size",
+        "type": "select",
+        "label": "正文默认字体大小",
+        "default": "15",
+        "options": [
+          { "value": "13", "label": "紧凑小字号 (13px)" },
+          { "value": "14", "label": "标准排版 (14px)" },
+          { "value": "15", "label": "舒适适中 (15px)" },
+          { "value": "16", "label": "易读大字 (16px)" },
+          { "value": "18", "label": "超大沉浸 (18px)" }
+        ]
+      },
+      {
+        "key": "embed_images_base64",
+        "type": "boolean",
+        "label": "HTML/Docx 默认内联本地图片为 Base64（离线不丢图）",
+        "default": true
+      },
+      {
+        "key": "include_frontmatter",
+        "type": "boolean",
+        "label": "默认包含 YAML Frontmatter 元数据（标题/标签/日期）",
+        "default": true
+      },
+      {
+        "key": "show_toolbar_button",
+        "type": "boolean",
+        "label": "在笔记页面右上角显示「增强导出」快捷入口",
+        "default": true
+      },
+      {
+        "key": "pandoc_path",
+        "type": "text",
+        "label": "Pandoc 可执行文件路径（可选，未安装时无需填写）",
+        "default": "pandoc"
+      }
+    ]
+  }
+}
