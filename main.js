@@ -1002,7 +1002,7 @@ export default {
     let settings = {
       defaultFormat: "html",
       defaultFontSize: "15",
-      buttonPosition: "bottom-right",
+      buttonPosition: "toolbar",
       embedImagesBase64: true,
       includeFrontmatter: true,
       pandocPath: "pandoc",
@@ -1019,7 +1019,12 @@ export default {
 
         if (fmt !== null) settings.defaultFormat = String(fmt);
         if (fs !== null) settings.defaultFontSize = String(fs);
-        if (pos !== null) settings.buttonPosition = String(pos);
+        if (pos !== null) {
+          const p = String(pos);
+          if (p === "fab" || p === "bottom-right") settings.buttonPosition = "fab";
+          else if (p === "hidden") settings.buttonPosition = "hidden";
+          else settings.buttonPosition = "toolbar";
+        }
         if (embed !== null) settings.embedImagesBase64 = Boolean(embed);
         if (fm !== null) settings.includeFrontmatter = Boolean(fm);
         if (pandoc !== null) settings.pandocPath = String(pandoc);
@@ -1476,60 +1481,128 @@ export default {
       },
     });
 
-    function injectToolbarButton() {
-      document.querySelectorAll(".edgeever-enhancing-export-trigger-btn").forEach((b) => b.remove());
+    // ==================== 14. 触发按钮安全挂载与原生无缝融合 ====================
+    let currentButtonEl = null;
 
-      if (settings.buttonPosition === "hidden") return;
+    function cleanupButton() {
+      if (currentButtonEl) {
+        try {
+          currentButtonEl.remove();
+        } catch (e) {}
+        currentButtonEl = null;
+      }
+      document
+        .querySelectorAll("#edgeever-enhancing-export-btn, .edgeever-enhancing-export-trigger-btn")
+        .forEach((b) => b.remove());
+    }
+
+    function findFormattingToolbar() {
+      // 1. 常见编辑器工具栏选择器
+      const selectors = [
+        ".edgeever-editor-toolbar",
+        ".ProseMirror-menubar",
+        ".tiptap-toolbar",
+        '[role="toolbar"]',
+        ".editor-toolbar",
+        ".note-editor-toolbar",
+      ];
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) return el;
+      }
+
+      // 2. 启发式：查找包含多个按钮的格式化工具栏行
+      const toolbars = document.querySelectorAll("div, nav, header");
+      for (const tb of toolbars) {
+        const btns = tb.querySelectorAll("button");
+        if (btns.length >= 6) {
+          return tb;
+        }
+      }
+
+      return null;
+    }
+
+    function ensureButtonMounted() {
+      if (settings.buttonPosition === "hidden") {
+        cleanupButton();
+        return;
+      }
+
+      // 核心防抖防死循环机制：如果按钮已在 DOM 树中并且正常连接，绝对不要重新创建！
+      if (currentButtonEl && currentButtonEl.isConnected) {
+        return;
+      }
+
+      const existing = document.getElementById("edgeever-enhancing-export-btn");
+      if (existing && existing.isConnected) {
+        currentButtonEl = existing;
+        return;
+      }
+
+      cleanupButton();
 
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.title = "增强导出为 HTML / Word / PDF / Markdown (Enhancing Export)";
-      btn.innerHTML = `
+      btn.id = "edgeever-enhancing-export-btn";
+      btn.title = "增强导出 (HTML / Word / PDF / Markdown)";
+
+      // 高度贴合原生的精致矢量图标 (无任何多余文字)
+      const svgIcon = `
         <svg viewBox="0 0 24 24">
-          <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z" />
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
         </svg>
-        <span>增强导出</span>
       `;
-      btn.onclick = (e) => {
+
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
         e.stopPropagation();
         openExportModal();
-      };
+      });
 
       if (settings.buttonPosition === "toolbar") {
-        const formattingToolbar =
-          document.querySelector(".edgeever-editor-toolbar") ||
-          document.querySelector('[role="toolbar"]') ||
-          document.querySelector(".tiptap-toolbar");
-
-        if (formattingToolbar) {
-          btn.className = "edgeever-enhancing-export-trigger-btn";
-          formattingToolbar.appendChild(btn);
+        const toolbar = findFormattingToolbar();
+        if (toolbar) {
+          btn.className = "edgeever-enhancing-export-trigger-btn is-toolbar-btn";
+          btn.innerHTML = svgIcon;
+          toolbar.appendChild(btn);
+          currentButtonEl = btn;
           return;
         }
       }
 
-      // 默认推荐：右下角悬浮胶囊按钮 (is-fab)，彻底不遮挡任何顶部标题、字数统计或菜单！
+      // 悬浮模式 (或找不到工具栏时的安全后备模式，严格位于原生 AI 唤出按钮上方)
       btn.className = "edgeever-enhancing-export-trigger-btn is-fab";
+      btn.innerHTML = svgIcon;
       document.body.appendChild(btn);
+      currentButtonEl = btn;
     }
 
     let timer = null;
     const observer = new MutationObserver(() => {
+      // 只要按钮完好地挂在页面上，直接 return，避免任何闪烁和重绘死循环
+      if (currentButtonEl && currentButtonEl.isConnected) {
+        return;
+      }
       clearTimeout(timer);
-      timer = setTimeout(injectToolbarButton, 100);
+      timer = setTimeout(ensureButtonMounted, 350);
     });
+
     observer.observe(document.body, { childList: true, subtree: true });
 
-    setTimeout(injectToolbarButton, 300);
+    setTimeout(ensureButtonMounted, 300);
 
     context.events.on("settings.changed", async () => {
       await loadSettings();
-      injectToolbarButton();
+      cleanupButton();
+      ensureButtonMounted();
     });
 
     return () => {
       observer.disconnect();
-      document.querySelectorAll(".edgeever-enhancing-export-trigger-btn").forEach((b) => b.remove());
+      cleanupButton();
       document.querySelectorAll(".edgeever-export-modal-backdrop").forEach((b) => b.remove());
       const oldFrame = document.getElementById("ee-export-print-frame");
       if (oldFrame) oldFrame.remove();

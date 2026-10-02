@@ -25,59 +25,95 @@
   --ee-export-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 
-/* 右下角悬浮胶囊按钮 (FAB) - 绝不遮挡顶部标题与操作 */
+/* ==================== 触发入口按钮样式 ==================== */
+
+/* 1. 悬浮按钮 (FAB) - 严格避开原生右下角 AI 唤出按钮，位于 AI 按钮正上方 */
 .edgeever-enhancing-export-trigger-btn.is-fab {
   position: fixed;
-  bottom: 26px;
-  right: 28px;
+  bottom: 84px;
+  right: 24px;
   z-index: 990;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 999px;
+  justify-content: center;
   background: var(--ee-export-primary);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.38);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 .edgeever-enhancing-export-trigger-btn.is-fab:hover {
   background: var(--ee-export-primary-hover);
-  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.48);
-  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.52);
+  transform: translateY(-2px) scale(1.05);
 }
 
 .edgeever-enhancing-export-trigger-btn.is-fab:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 
 .edgeever-enhancing-export-trigger-btn.is-fab svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-/* 工具栏模式 */
-.edgeever-enhancing-export-trigger-btn:not(.is-fab) {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--ee-export-text);
-  background: var(--ee-export-bg-subtle);
-  border: 1px solid var(--ee-export-border);
-  border-radius: 6px;
-  cursor: pointer;
-  margin-left: 6px;
+/* 2. 编辑器工具栏纯图标模式 (100% 像素级贴合原生工具栏按钮，绝无任何竖排文字) */
+.edgeever-enhancing-export-trigger-btn.is-toolbar-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
+  padding: 0 !important;
+  margin: 0 2px !important;
+  border: none !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--ee-export-text-muted, #94a3b8) !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  transition: all 0.15s ease !important;
+  line-height: 1 !important;
+}
+
+.edgeever-enhancing-export-trigger-btn.is-toolbar-btn:hover {
+  background: rgba(125, 125, 125, 0.15) !important;
+  color: var(--ee-export-text, #f1f5f9) !important;
+}
+
+.edgeever-enhancing-export-trigger-btn.is-toolbar-btn:active {
+  background: rgba(125, 125, 125, 0.25) !important;
+}
+
+.edgeever-enhancing-export-trigger-btn.is-toolbar-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  pointer-events: none !important;
 }
 
 /* 弹窗遮罩 */

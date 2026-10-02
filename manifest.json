@@ -2,7 +2,7 @@
   "type": "plugin",
   "id": "org.edgeever.plugins.enhancing-export",
   "name": "Enhancing Export",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "apiVersion": "2",
   "settingsUi": "host",
   "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with elegant white typography.",
@@ -56,10 +56,10 @@
         "key": "button_position",
         "type": "select",
         "label": "增强导出快捷入口按钮位置",
-        "default": "bottom-right",
+        "default": "toolbar",
         "options": [
-          { "value": "bottom-right", "label": "右下角悬浮胶囊按钮 (推荐，绝不遮挡操作)" },
-          { "value": "toolbar", "label": "嵌入编辑器格式工具栏末尾" },
+          { "value": "toolbar", "label": "嵌入编辑器格式工具栏末尾 (原生纯图标，推荐)" },
+          { "value": "fab", "label": "右下角悬浮按钮 (避开原生 AI，位于其上方)" },
           { "value": "hidden", "label": "隐藏按钮 (仅通过快捷键或命令面板唤出)" }
         ]
       },
