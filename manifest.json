@@ -2,14 +2,14 @@
   "type": "plugin",
   "id": "org.edgeever.plugins.enhancing-export",
   "name": "Enhancing Export",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "apiVersion": "2",
   "settingsUi": "host",
-  "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc/.docx), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with customizable styling.",
+  "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with elegant white typography.",
   "locales": {
     "zh-CN": {
       "name": "增强导出 (Enhancing Export)",
-      "description": "参考 obsidian-enhancing-export 打造的专业级多格式增强导出插件。支持将 EdgeEver 笔记导出为带语法高亮与图片的独立 HTML、Word 文档 (.doc/docx)、纯净与博客 Markdown (Hugo/Hexo)、高保真可调 PDF 与 Pandoc 命令行扩展，支持实时排版预览与 Pandoc 智能检测指引。"
+      "description": "参考 obsidian-enhancing-export 打造的专业级多格式增强导出插件。支持将 EdgeEver 笔记导出为带代码语法高亮与图片的独立 HTML、Word 文档 (.doc)、纯净与博客 Markdown (Hugo/Hexo)、高保真 PDF 打印与 Pandoc 命令行扩展，采用经典纯白优雅排版。"
     }
   },
   "author": "zyhcs",
@@ -32,24 +32,11 @@
         "default": "html",
         "options": [
           { "value": "html", "label": "独立离线网页 (.html)" },
-          { "value": "doc", "label": "Word 文档 (.doc / 兼容 docx)" },
+          { "value": "doc", "label": "Word 文档 (.doc / 原生兼容)" },
           { "value": "pdf", "label": "高保真排版打印 / PDF" },
           { "value": "md", "label": "纯净标准 Markdown (.md)" },
           { "value": "hugo", "label": "博客 Markdown (Hugo/Hexo)" },
           { "value": "pandoc", "label": "Pandoc 学术与扩展格式" }
-        ]
-      },
-      {
-        "key": "default_theme",
-        "type": "select",
-        "label": "默认排版风格主题",
-        "default": "github-light",
-        "options": [
-          { "value": "github-light", "label": "GitHub 浅色经典 (GitHub Light)" },
-          { "value": "modern-dark", "label": "暗夜极客黑 (Modern Dark)" },
-          { "value": "academic", "label": "学术论文风 (Academic Paper)" },
-          { "value": "editorial", "label": "优雅杂志风 (Editorial Serif)" },
-          { "value": "clean-white", "label": "极简纯白风 (Clean Minimal)" }
         ]
       },
       {
@@ -91,7 +78,7 @@
       {
         "key": "pandoc_path",
         "type": "text",
-        "label": "Pandoc 可执行文件路径 (仅桌面端客户端有效)",
+        "label": "Pandoc 命令行执行路径 (仅桌面客户端需要，Web/移动端无需安装)",
         "default": "pandoc"
       }
     ]

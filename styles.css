@@ -25,50 +25,32 @@
   --ee-export-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 
-/* 快捷触发按钮 - 工具栏嵌入风格 */
-.edgeever-enhancing-export-trigger-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  font-size: 12.5px;
-  font-weight: 550;
-  color: var(--ee-export-text);
-  background: var(--ee-export-bg-subtle);
-  border: 1px solid var(--ee-export-border);
-  border-radius: 7px;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  user-select: none;
-  line-height: 1.2;
-}
-
-.edgeever-enhancing-export-trigger-btn:hover {
-  background: var(--ee-export-card-hover);
-  border-color: var(--ee-export-border-focus);
-  color: var(--ee-export-primary);
-  transform: translateY(-1px);
-}
-
-/* 快捷触发按钮 - 右下角悬浮胶囊风格 (FAB) 绝对不遮挡顶部 */
+/* 右下角悬浮胶囊按钮 (FAB) - 绝不遮挡顶部标题与操作 */
 .edgeever-enhancing-export-trigger-btn.is-fab {
   position: fixed;
   bottom: 26px;
   right: 28px;
   z-index: 990;
-  padding: 8px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
   font-size: 13px;
+  font-weight: 600;
   border-radius: 999px;
   background: var(--ee-export-primary);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35);
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
 .edgeever-enhancing-export-trigger-btn.is-fab:hover {
   background: var(--ee-export-primary-hover);
-  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.45);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.48);
   transform: translateY(-2px);
 }
 
@@ -76,13 +58,29 @@
   transform: translateY(0);
 }
 
-.edgeever-enhancing-export-trigger-btn svg {
-  width: 14px;
-  height: 14px;
+.edgeever-enhancing-export-trigger-btn.is-fab svg {
+  width: 15px;
+  height: 15px;
   fill: currentColor;
 }
 
-/* 弹窗遮罩层 */
+/* 工具栏模式 */
+.edgeever-enhancing-export-trigger-btn:not(.is-fab) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ee-export-text);
+  background: var(--ee-export-bg-subtle);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+/* 弹窗遮罩 */
 .edgeever-export-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -102,14 +100,15 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-/* 弹窗主体（大尺寸宽屏体验） */
+/* 弹窗主体（高度严格受限在视口内，杜绝无限拉长） */
 .edgeever-export-modal {
-  width: 1120px;
-  max-width: 96vw;
-  height: 88vh;
+  width: 1060px;
+  max-width: 95vw;
+  height: 84vh;
+  max-height: 820px;
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 18px;
+  border-radius: 16px;
   box-shadow: var(--ee-export-shadow);
   display: flex;
   flex-direction: column;
@@ -135,15 +134,15 @@
 }
 
 .edgeever-export-modal-icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
   background: rgba(16, 185, 129, 0.12);
   color: var(--ee-export-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .edgeever-export-modal-title {
@@ -162,14 +161,14 @@
   background: none;
   border: none;
   color: var(--ee-export-text-muted);
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 17px;
   transition: all 0.15s ease;
 }
 
@@ -178,34 +177,37 @@
   color: var(--ee-export-text);
 }
 
-/* 弹窗主体双栏布局 */
+/* 弹窗主体双栏 */
 .edgeever-export-modal-body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
-/* 左侧控制栏 (360px) */
+/* 左侧控制栏 (330px 独立内滚动) */
 .edgeever-export-sidebar {
-  width: 360px;
+  width: 330px;
   border-right: 1px solid var(--ee-export-border);
   background: var(--ee-export-bg-subtle);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  height: 100%;
 }
 
 .edgeever-export-sidebar-scroll {
-  padding: 18px;
+  padding: 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   flex: 1;
+  min-height: 0;
 }
 
 .edgeever-export-section-title {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -217,15 +219,15 @@
 .edgeever-export-cards-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .edgeever-export-format-card {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
   border: 1.5px solid transparent;
   background: var(--ee-export-bg-modal);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
@@ -245,9 +247,9 @@
 }
 
 .format-card-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -269,13 +271,13 @@
 }
 
 .format-card-name {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ee-export-text);
 }
 
 .format-card-ext {
-  font-size: 10.5px;
+  font-size: 10px;
   font-family: SFMono-Regular, Menlo, monospace;
   padding: 1px 5px;
   border-radius: 4px;
@@ -285,21 +287,21 @@
 }
 
 .format-card-desc {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--ee-export-text-muted);
   margin-top: 2px;
   line-height: 1.3;
 }
 
-/* 控制表单组 */
+/* 控制表单项 */
 .edgeever-form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .edgeever-form-label {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ee-export-text);
   display: flex;
@@ -308,19 +310,18 @@
 }
 
 .edgeever-form-hint {
-  font-size: 11px;
-  font-weight: 400;
+  font-size: 10.5px;
   color: var(--ee-export-text-muted);
 }
 
 .edgeever-input-text {
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 11px;
   font-size: 13px;
   color: var(--ee-export-text);
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 8px;
+  border-radius: 7px;
   box-sizing: border-box;
   outline: none;
   transition: all 0.15s ease;
@@ -331,17 +332,18 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
-/* 胶囊按钮组 */
+/* 字号胶囊按钮 */
 .edgeever-segment-group {
   display: flex;
   gap: 5px;
-  flex-wrap: wrap;
 }
 
 .edgeever-segment-btn {
-  padding: 5px 10px;
+  flex: 1;
+  padding: 5px 0;
+  text-align: center;
   font-size: 12px;
-  border-radius: 7px;
+  border-radius: 6px;
   border: 1px solid var(--ee-export-border);
   background: var(--ee-export-bg-modal);
   color: var(--ee-export-text);
@@ -352,7 +354,6 @@
 
 .edgeever-segment-btn:hover {
   background: var(--ee-export-card-hover);
-  border-color: var(--ee-export-border-focus);
 }
 
 .edgeever-segment-btn.is-active {
@@ -360,25 +361,24 @@
   border-color: var(--ee-export-primary);
   color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.25);
 }
 
-/* 高级复选开关 */
+/* 高级复选 */
 .edgeever-checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: 7px;
+  padding: 8px 11px;
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .edgeever-checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 11.5px;
   cursor: pointer;
   user-select: none;
   color: var(--ee-export-text);
@@ -386,20 +386,18 @@
 
 .edgeever-checkbox-label input[type="checkbox"] {
   accent-color: var(--ee-export-primary);
-  width: 15px;
-  height: 15px;
-  border-radius: 4px;
-  cursor: pointer;
+  width: 14px;
+  height: 14px;
 }
 
-/* 左侧底部快捷按钮 */
+/* 左侧底部固定按钮栏 */
 .edgeever-export-sidebar-footer {
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-top: 1px solid var(--ee-export-border);
   background: var(--ee-export-bg-subtle);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   flex-shrink: 0;
 }
 
@@ -413,10 +411,10 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 9px 14px;
-  font-size: 13px;
+  padding: 8px 12px;
+  font-size: 12.5px;
   font-weight: 550;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   transition: all 0.16s ease;
   user-select: none;
@@ -441,7 +439,7 @@
 .edgeever-btn-primary {
   background: var(--ee-export-primary);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 7px rgba(16, 185, 129, 0.25);
 }
 
 .edgeever-btn-primary:hover {
@@ -452,21 +450,20 @@
 .edgeever-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
-/* ==================== 右侧：真实所见即所得排版预览区 ==================== */
+/* ==================== 右侧：实时排版纸张预览 ==================== */
 .edgeever-export-preview-pane {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #eef2f6;
+  background: #f1f4f8;
   overflow: hidden;
-  position: relative;
+  height: 100%;
 }
 
 .dark .edgeever-export-preview-pane {
-  background: #0f1218;
+  background: #11141a;
 }
 
 .edgeever-preview-header {
@@ -493,46 +490,47 @@
   border: 1px solid var(--ee-export-border);
   color: var(--ee-export-text-muted);
   font-size: 11px;
-  font-weight: 500;
 }
 
-/* 预览可滚动视口 */
+/* 预览可滚动视口 (独立纵向滚动) */
 .edgeever-preview-viewport {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
   display: flex;
   justify-content: center;
+  min-height: 0;
 }
 
-/* 纸张容器 */
+/* 纸张容器（经典纯白优雅排版） */
 .edgeever-live-preview-paper {
   width: 100%;
-  max-width: 720px;
-  min-height: 100%;
+  max-width: 700px;
   background: #ffffff;
   color: #1f2328;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 40px 36px 64px 36px;
+  padding: 36px 36px 60px 36px;
   box-sizing: border-box;
-  transition: all 0.2s ease;
-  line-height: 1.7;
+  line-height: 1.72;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  height: fit-content;
 }
 
 .edgeever-live-preview-paper .preview-title {
-  font-size: 2em;
+  font-size: 1.9em;
   font-weight: 750;
-  margin: 0 0 12px 0;
+  margin: 0 0 10px 0;
   line-height: 1.25;
+  color: #0f172a;
 }
 
 .edgeever-live-preview-paper .preview-meta {
   font-size: 0.85em;
-  color: var(--ee-export-text-muted);
-  border-bottom: 1px solid var(--ee-export-border);
-  padding-bottom: 14px;
-  margin-bottom: 24px;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 22px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -545,14 +543,15 @@
   line-height: 1.35;
   margin-top: 1.5em;
   margin-bottom: 0.6em;
+  color: #0f172a;
 }
 
-.edgeever-live-preview-paper h1 { font-size: 1.65em; border-bottom: 1px solid var(--ee-export-border); padding-bottom: 0.3em; }
-.edgeever-live-preview-paper h2 { font-size: 1.35em; border-bottom: 1px solid var(--ee-export-border); padding-bottom: 0.25em; }
-.edgeever-live-preview-paper h3 { font-size: 1.15em; }
+.edgeever-live-preview-paper h1 { font-size: 1.6em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }
+.edgeever-live-preview-paper h2 { font-size: 1.3em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25em; }
+.edgeever-live-preview-paper h3 { font-size: 1.12em; }
 
 .edgeever-live-preview-paper p {
-  margin: 0.8em 0;
+  margin: 0.75em 0;
 }
 
 .edgeever-live-preview-paper img {
@@ -561,7 +560,7 @@
   border-radius: 6px;
   margin: 1.2em 0;
   display: block;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
 }
 
 .edgeever-live-preview-paper table {
@@ -573,27 +572,28 @@
 
 .edgeever-live-preview-paper th,
 .edgeever-live-preview-paper td {
-  border: 1px solid var(--ee-export-border);
+  border: 1px solid #d0d7de;
   padding: 7px 12px;
   text-align: left;
 }
 
 .edgeever-live-preview-paper th {
-  background: var(--ee-export-bg-subtle);
+  background: #f6f8fa;
   font-weight: 600;
 }
 
 .edgeever-live-preview-paper blockquote {
   margin: 1.2em 0;
   padding: 8px 14px;
-  border-left: 4px solid var(--ee-export-primary);
-  background: var(--ee-export-bg-subtle);
+  border-left: 4px solid #10b981;
+  background: #f8fafc;
+  color: #475569;
   border-radius: 0 6px 6px 0;
 }
 
 /* ==================== 代码块高保真 Mac 风格与高亮样式 ==================== */
 .ee-code-block-wrapper {
-  margin: 1.4em 0;
+  margin: 1.3em 0;
   background: #1e1e24;
   border: 1px solid #33333d;
   border-radius: 10px;
@@ -605,7 +605,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 7px 14px;
   background: rgba(0, 0, 0, 0.25);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -656,7 +656,7 @@
   color: #e6edf3;
 }
 
-/* 语法着色 Token 类 (Light / Dark 响应) */
+/* 语法着色 Token 类 */
 .hl-keyword { color: #d2a8ff; font-weight: 600; }
 .hl-string { color: #a5d6ff; }
 .hl-comment { color: #8b949e; font-style: italic; }
@@ -665,7 +665,7 @@
 .hl-abap-system-var { color: #ff7b72; font-weight: 600; }
 .hl-operator { color: #79c0ff; }
 
-/* 纯文本代码与 Pandoc 命令行预览 */
+/* 纯文本预览 */
 .edgeever-raw-preview-text {
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
@@ -678,41 +678,86 @@
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   width: 100%;
-  max-width: 720px;
+  max-width: 700px;
   box-sizing: border-box;
+  height: fit-content;
 }
 
-/* Pandoc 安装检测与指引卡片 */
-.ee-pandoc-guide-box {
-  background: var(--ee-export-bg-subtle);
-  border: 1px solid var(--ee-export-border);
-  border-radius: 10px;
-  padding: 16px;
-  margin-top: 14px;
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-.ee-pandoc-guide-title {
-  font-weight: 650;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ee-export-text);
-  margin-bottom: 8px;
-}
-
-.ee-pandoc-cmd-snippet {
+/* Pandoc 独立检测与安装指引对话框 */
+.ee-pandoc-dialog {
+  width: 540px;
+  max-width: 90vw;
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-family: SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
-  margin: 4px 0 8px 0;
+  border-radius: 14px;
+  box-shadow: var(--ee-export-shadow);
+  overflow: hidden;
+  animation: eeFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ee-pandoc-dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--ee-export-border);
+}
+
+.ee-pandoc-dialog-body {
+  padding: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ee-export-text);
+}
+
+.ee-pandoc-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.ee-pandoc-status-badge.is-ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.ee-pandoc-status-badge.is-warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.ee-pandoc-code-box {
+  background: var(--ee-export-bg-subtle);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 6px 0 12px 0;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ee-pandoc-copy-btn {
+  background: var(--ee-export-bg-modal);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--ee-export-text);
+  transition: all 0.15s ease;
+}
+
+.ee-pandoc-copy-btn:hover {
+  background: var(--ee-export-card-hover);
+  border-color: var(--ee-export-primary);
 }
 
 /* 打印与 PDF 专用的页面样式 */

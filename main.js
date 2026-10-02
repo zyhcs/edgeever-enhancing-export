@@ -1,7 +1,7 @@
 /**
  * EdgeEver Enhancing Export Plugin
  * 专业级多格式增强导出插件 (Inspired by obsidian-enhancing-export)
- * 深度适配 EdgeEver 笔记系统，提供真实文档所见即所得排版预览、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌、Word (.doc/.docx)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印及 Pandoc 智能检测指引。
+ * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印及 Pandoc 智能检测指引。
  */
 
 // ==================== 1. 专业级代码语法高亮引擎 ====================
@@ -80,6 +80,15 @@ GRAMMARS.py = GRAMMARS.python;
 GRAMMARS.sh = GRAMMARS.bash;
 GRAMMARS.shell = GRAMMARS.bash;
 
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function highlightCode(code, lang) {
   const normLang = (lang || "").toLowerCase().trim();
   const rules = GRAMMARS[normLang] || (normLang === "abap" ? GRAMMARS.abap : null);
@@ -129,68 +138,17 @@ function highlightCode(code, lang) {
   return result;
 }
 
-// ==================== 2. 内置独立排版主题样式库 ====================
-const THEMES = {
-  "github-light": {
-    name: "GitHub 浅色经典",
-    bg: "#ffffff",
-    text: "#1f2328",
-    muted: "#656d76",
-    border: "#d0d7de",
-    codeBg: "#161b22",
-    accent: "#0969da",
-    blockquoteBorder: "#d0d7de",
-    tableHeaderBg: "#f6f8fa",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
-  },
-  "modern-dark": {
-    name: "暗夜极客黑",
-    bg: "#0d1117",
-    text: "#e6edf3",
-    muted: "#848d97",
-    border: "#30363d",
-    codeBg: "#161b22",
-    accent: "#2f81f7",
-    blockquoteBorder: "#3b434b",
-    tableHeaderBg: "#161b22",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
-  },
-  academic: {
-    name: "学术论文风",
-    bg: "#fcfbf7",
-    text: "#222222",
-    muted: "#555555",
-    border: "#d5d1c8",
-    codeBg: "#1e1e24",
-    accent: "#8b261e",
-    blockquoteBorder: "#8b261e",
-    tableHeaderBg: "#eee9de",
-    fontFamily: '"Times New Roman", "Songti SC", "SimSun", Georgia, serif',
-  },
-  editorial: {
-    name: "优雅杂志风",
-    bg: "#faf7f2",
-    text: "#2c2a29",
-    muted: "#7c7774",
-    border: "#e2ded7",
-    codeBg: "#1e1e24",
-    accent: "#b45309",
-    blockquoteBorder: "#d97706",
-    tableHeaderBg: "#f2ece1",
-    fontFamily: '"Georgia", "Baskerville", "Source Han Serif CN", serif',
-  },
-  "clean-white": {
-    name: "极简纯白风",
-    bg: "#ffffff",
-    text: "#111827",
-    muted: "#6b7280",
-    border: "#e5e7eb",
-    codeBg: "#1f2937",
-    accent: "#059669",
-    blockquoteBorder: "#10b981",
-    tableHeaderBg: "#f3f4f6",
-    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
-  },
+// ==================== 2. 标准白色优雅排版设计定义 ====================
+const WHITE_STYLE = {
+  bg: "#ffffff",
+  text: "#1f2328",
+  muted: "#64748b",
+  border: "#e2e8f0",
+  codeBg: "#1e1e24",
+  accent: "#059669",
+  blockquoteBorder: "#10b981",
+  tableHeaderBg: "#f8fafc",
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
 };
 
 // ==================== 3. 图片提取与 Base64 转换器 ====================
@@ -318,15 +276,6 @@ async function resolveAllImagesInMarkdown(rawMarkdown, context) {
 }
 
 // ==================== 4. 高保真 Markdown 解析与渲染引擎 ====================
-function escapeHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function renderMarkdownToHtml(markdown) {
   if (!markdown) return "";
 
@@ -589,7 +538,7 @@ function renderMarkdownToHtml(markdown) {
 }
 
 // ==================== 5. 独立 HTML 导出生成器 (含全量内联 CSS 与高亮) ====================
-function generateStandaloneHtml(article, themeConfig, options = {}) {
+function generateStandaloneHtml(article, options = {}) {
   const { title, contentHtml, updatedAt, tags, notebook } = article;
   const fontSize = options.fontSize || 15;
   const metaItems = [
@@ -608,13 +557,13 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
   <title>${escapeHtml(title || "无标题笔记")}</title>
   <style>
     :root {
-      --ee-bg: ${themeConfig.bg};
-      --ee-text: ${themeConfig.text};
-      --ee-muted: ${themeConfig.muted};
-      --ee-border: ${themeConfig.border};
-      --ee-code-bg: ${themeConfig.codeBg};
-      --ee-accent: ${themeConfig.accent};
-      --ee-font: ${themeConfig.fontFamily};
+      --ee-bg: ${WHITE_STYLE.bg};
+      --ee-text: ${WHITE_STYLE.text};
+      --ee-muted: ${WHITE_STYLE.muted};
+      --ee-border: ${WHITE_STYLE.border};
+      --ee-code-bg: ${WHITE_STYLE.codeBg};
+      --ee-accent: ${WHITE_STYLE.accent};
+      --ee-font: ${WHITE_STYLE.fontFamily};
     }
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
@@ -628,25 +577,25 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
       -webkit-font-smoothing: antialiased;
     }
     .ee-container {
-      max-width: 840px;
+      max-width: 820px;
       margin: 0 auto;
-      padding: 48px 24px 80px 24px;
+      padding: 48px 28px 80px 28px;
     }
     .ee-article-header {
       border-bottom: 1px solid var(--ee-border);
-      padding-bottom: 20px;
-      margin-bottom: 36px;
+      padding-bottom: 18px;
+      margin-bottom: 32px;
     }
     .ee-title {
-      font-size: 2.2em;
+      font-size: 2.1em;
       font-weight: 750;
       line-height: 1.25;
-      margin: 0 0 14px 0;
+      margin: 0 0 12px 0;
       color: var(--ee-text);
       letter-spacing: -0.02em;
     }
     .ee-meta {
-      font-size: 0.88em;
+      font-size: 0.86em;
       color: var(--ee-muted);
       display: flex;
       flex-wrap: wrap;
@@ -659,19 +608,19 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
       margin-top: 1.6em;
       margin-bottom: 0.6em;
     }
-    h1 { font-size: 1.8em; border-bottom: 1px solid var(--ee-border); padding-bottom: 0.3em; }
-    h2 { font-size: 1.45em; border-bottom: 1px solid var(--ee-border); padding-bottom: 0.25em; }
-    h3 { font-size: 1.22em; }
+    h1 { font-size: 1.7em; border-bottom: 1px solid var(--ee-border); padding-bottom: 0.3em; }
+    h2 { font-size: 1.4em; border-bottom: 1px solid var(--ee-border); padding-bottom: 0.25em; }
+    h3 { font-size: 1.18em; }
     h4 { font-size: 1.05em; }
-    p { margin: 0.9em 0; }
+    p { margin: 0.85em 0; }
     a { color: var(--ee-accent); text-decoration: none; border-bottom: 1px solid transparent; }
     a:hover { border-bottom-color: var(--ee-accent); }
     blockquote {
-      margin: 1.4em 0;
+      margin: 1.3em 0;
       padding: 10px 18px;
-      border-left: 4px solid ${themeConfig.blockquoteBorder};
-      background: rgba(0, 0, 0, 0.03);
-      color: var(--ee-muted);
+      border-left: 4px solid ${WHITE_STYLE.blockquoteBorder};
+      background: #f8fafc;
+      color: #475569;
       border-radius: 0 8px 8px 0;
     }
     blockquote p { margin: 0.4em 0; }
@@ -685,20 +634,20 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
     .ee-inline-code {
       font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 0.88em;
-      background: rgba(0, 0, 0, 0.05);
-      color: var(--ee-text);
+      background: #f1f5f9;
+      color: #0f172a;
       padding: 2px 6px;
       border-radius: 4px;
       border: 1px solid var(--ee-border);
     }
-    /* 代码块与语法着色 */
+    /* 代码块与高亮 */
     .ee-code-block-wrapper {
-      margin: 1.5em 0;
+      margin: 1.4em 0;
       background: #1e1e24;
       border: 1px solid #33333d;
       border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     }
     .ee-code-header {
       display: flex;
@@ -748,14 +697,14 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
     .hl-function { color: #f0883e; }
     .hl-abap-system-var { color: #ff7b72; font-weight: 600; }
     .hl-operator { color: #79c0ff; }
-    .ee-table-wrapper { overflow-x: auto; margin: 1.5em 0; }
+    .ee-table-wrapper { overflow-x: auto; margin: 1.4em 0; }
     table { width: 100%; border-collapse: collapse; font-size: 0.94em; }
     th, td { border: 1px solid var(--ee-border); padding: 8px 14px; text-align: left; }
-    th { background: ${themeConfig.tableHeaderBg}; font-weight: 600; }
+    th { background: ${WHITE_STYLE.tableHeaderBg}; font-weight: 600; }
     .ee-math-block {
-      margin: 1.5em 0;
+      margin: 1.4em 0;
       padding: 14px;
-      background: rgba(0, 0, 0, 0.03);
+      background: #f8fafc;
       border-radius: 8px;
       text-align: center;
       overflow-x: auto;
@@ -771,8 +720,8 @@ function generateStandaloneHtml(article, themeConfig, options = {}) {
       margin: 0 2px;
     }
     .ee-footer {
-      margin-top: 60px;
-      padding-top: 24px;
+      margin-top: 56px;
+      padding-top: 20px;
       border-top: 1px solid var(--ee-border);
       text-align: center;
       font-size: 0.82em;
@@ -836,15 +785,15 @@ function generateWordDocument(article, htmlContent) {
       line-height: 1.6;
       color: #111111;
     }
-    h1 { font-size: 22.0pt; font-weight: bold; color: #1a202c; margin-top: 18.0pt; margin-bottom: 8.0pt; }
-    h2 { font-size: 16.0pt; font-weight: bold; color: #2d3748; margin-top: 14.0pt; margin-bottom: 6.0pt; }
-    h3 { font-size: 13.5pt; font-weight: bold; color: #4a5568; margin-top: 10.0pt; margin-bottom: 4.0pt; }
+    h1 { font-size: 21.0pt; font-weight: bold; color: #1a202c; margin-top: 18.0pt; margin-bottom: 8.0pt; }
+    h2 { font-size: 15.5pt; font-weight: bold; color: #2d3748; margin-top: 14.0pt; margin-bottom: 6.0pt; }
+    h3 { font-size: 13.0pt; font-weight: bold; color: #4a5568; margin-top: 10.0pt; margin-bottom: 4.0pt; }
     p { margin: 6.0pt 0; }
     table { width: 100%; border-collapse: collapse; margin: 12.0pt 0; }
     th, td { border: 1.0pt solid #cbd5e0; padding: 6.0pt 9.0pt; text-align: left; }
     th { background: #edf2f7; font-weight: bold; }
     blockquote {
-      border-left: 3.0pt solid #3182ce;
+      border-left: 3.0pt solid #10b981;
       padding-left: 9.0pt;
       margin: 10.0pt 0;
       color: #4a5568;
@@ -1013,7 +962,7 @@ const EXPORT_FORMATS = [
     ext: ".pdf",
     engine: "builtin",
     icon: "🖨️",
-    desc: "针对 A4 纸张排版优化，支持自选字号与主题，直接打印或另存为高清 PDF。",
+    desc: "针对 A4 纸张排版优化，白底黑字与高亮代码块，直接打印或另存为高清 PDF。",
     mime: "application/pdf",
   },
   {
@@ -1031,7 +980,7 @@ const EXPORT_FORMATS = [
     ext: ".md",
     engine: "builtin",
     icon: "🚀",
-    desc: "自动补充 YAML Frontmatter（标题、时间、标签、分类），完美适配静态博客流水线。",
+    desc: "自动补充 YAML Frontmatter（标题、时间、标签、分类），适配静态博客发布。",
     mime: "text/markdown;charset=utf-8",
   },
   {
@@ -1040,7 +989,7 @@ const EXPORT_FORMATS = [
     ext: ".epub",
     engine: "pandoc",
     icon: "⚙️",
-    desc: "利用 Pandoc 导出为 EPUB、LaTeX (.tex)、Typst、PowerPoint (.pptx) 等高级格式。",
+    desc: "基于 Pandoc 命令行导出为 EPUB、LaTeX、Typst 等高级格式（一键生成命令）。",
     mime: "text/plain",
   },
 ];
@@ -1052,7 +1001,6 @@ export default {
 
     let settings = {
       defaultFormat: "html",
-      defaultTheme: "github-light",
       defaultFontSize: "15",
       buttonPosition: "bottom-right",
       embedImagesBase64: true,
@@ -1063,7 +1011,6 @@ export default {
     async function loadSettings() {
       try {
         const fmt = await context.settings.get("default_format");
-        const thm = await context.settings.get("default_theme");
         const fs = await context.settings.get("default_font_size");
         const pos = await context.settings.get("button_position");
         const embed = await context.settings.get("embed_images_base64");
@@ -1071,7 +1018,6 @@ export default {
         const pandoc = await context.settings.get("pandoc_path");
 
         if (fmt !== null) settings.defaultFormat = String(fmt);
-        if (thm !== null) settings.defaultTheme = String(thm);
         if (fs !== null) settings.defaultFontSize = String(fs);
         if (pos !== null) settings.buttonPosition = String(pos);
         if (embed !== null) settings.embedImagesBase64 = Boolean(embed);
@@ -1136,7 +1082,6 @@ export default {
       }
 
       let selectedFormat = settings.defaultFormat;
-      let selectedTheme = settings.defaultTheme;
       let selectedFontSize = settings.defaultFontSize;
       let candidateFileName = (article.title || "Note").replace(/[\\/:*?"<>|]/g, "_");
 
@@ -1173,12 +1118,6 @@ export default {
                     <span class="edgeever-form-hint" id="ee-ext-hint">.html</span>
                   </label>
                   <input type="text" class="edgeever-input-text" id="ee-filename-input" value="${escapeHtml(candidateFileName)}" />
-                </div>
-
-                <!-- 排版风格主题 -->
-                <div class="edgeever-form-group" id="ee-theme-group">
-                  <label class="edgeever-form-label">排版设计风格</label>
-                  <div class="edgeever-segment-group" id="ee-theme-segments"></div>
                 </div>
 
                 <!-- 正文字号 -->
@@ -1223,7 +1162,7 @@ export default {
               <div class="edgeever-preview-header">
                 <span style="font-weight: 600;">📄 实时排版预览</span>
                 <div class="preview-badge-group">
-                  <span class="preview-pill" id="ee-preview-theme-pill">GitHub 浅色经典</span>
+                  <span class="preview-pill">经典纯白优雅排版</span>
                   <span class="preview-pill" id="ee-preview-size-pill">15px</span>
                 </div>
               </div>
@@ -1249,11 +1188,9 @@ export default {
       document.body.appendChild(backdrop);
 
       const cardsList = backdrop.querySelector(".edgeever-export-cards-list");
-      const themeSegments = backdrop.querySelector("#ee-theme-segments");
       const fontSizeSegments = backdrop.querySelector("#ee-fontsize-segments");
       const fileNameInput = backdrop.querySelector("#ee-filename-input");
       const extHint = backdrop.querySelector("#ee-ext-hint");
-      const previewThemePill = backdrop.querySelector("#ee-preview-theme-pill");
       const previewSizePill = backdrop.querySelector("#ee-preview-size-pill");
       const livePaper = backdrop.querySelector("#ee-live-paper");
       const rawPreview = backdrop.querySelector("#ee-raw-preview");
@@ -1261,6 +1198,8 @@ export default {
       const btnCopy = backdrop.querySelector("#ee-btn-copy");
       const btnClose = backdrop.querySelector(".edgeever-export-modal-close-btn");
 
+      // 清空卡片列表，防止任何意外重复追加
+      cardsList.innerHTML = "";
       EXPORT_FORMATS.forEach((fmt) => {
         const card = document.createElement("div");
         card.className = `edgeever-export-format-card ${fmt.id === selectedFormat ? "is-selected" : ""}`;
@@ -1284,21 +1223,6 @@ export default {
         cardsList.appendChild(card);
       });
 
-      Object.entries(THEMES).forEach(([key, thm]) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `edgeever-segment-btn ${key === selectedTheme ? "is-active" : ""}`;
-        btn.dataset.theme = key;
-        btn.textContent = thm.name;
-        btn.onclick = () => {
-          selectedTheme = key;
-          themeSegments.querySelectorAll(".edgeever-segment-btn").forEach((b) => b.classList.remove("is-active"));
-          btn.classList.add("is-active");
-          updateUiState();
-        };
-        themeSegments.appendChild(btn);
-      });
-
       fontSizeSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
         if (btn.dataset.size === selectedFontSize) btn.classList.add("is-active");
         btn.onclick = () => {
@@ -1311,40 +1235,17 @@ export default {
 
       function updateUiState() {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
-        const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
         extHint.textContent = fmtObj.ext;
 
         const isVisualFormat = selectedFormat === "html" || selectedFormat === "doc" || selectedFormat === "pdf";
 
-        backdrop.querySelector("#ee-theme-group").style.display = isVisualFormat ? "flex" : "none";
         backdrop.querySelector("#ee-fontsize-group").style.display = isVisualFormat ? "flex" : "none";
-
-        previewThemePill.textContent = themeConfig.name;
         previewSizePill.textContent = `${selectedFontSize}px`;
 
         if (isVisualFormat) {
           livePaper.style.display = "block";
           rawPreview.style.display = "none";
-
-          livePaper.style.backgroundColor = themeConfig.bg;
-          livePaper.style.color = themeConfig.text;
-          livePaper.style.fontFamily = themeConfig.fontFamily;
           livePaper.style.fontSize = `${selectedFontSize}px`;
-
-          livePaper.querySelectorAll("blockquote").forEach((bq) => {
-            bq.style.borderLeftColor = themeConfig.blockquoteBorder;
-            bq.style.color = themeConfig.muted;
-          });
-          livePaper.querySelectorAll("th, td").forEach((cell) => {
-            cell.style.borderColor = themeConfig.border;
-          });
-          livePaper.querySelectorAll("th").forEach((th) => {
-            th.style.backgroundColor = themeConfig.tableHeaderBg;
-          });
-          livePaper.querySelectorAll(".preview-meta").forEach((m) => {
-            m.style.borderColor = themeConfig.border;
-            m.style.color = themeConfig.muted;
-          });
 
           if (selectedFormat === "pdf") {
             btnExport.textContent = "🖨️ 打开打印 / 保存 PDF";
@@ -1362,35 +1263,15 @@ export default {
             const baseName = (fileNameInput.value || article.title || "Note").trim();
             btnExport.textContent = "📋 复制 Pandoc 命令行";
 
-            if (!isDesktop) {
-              rawPreview.innerHTML = `
-                <div style="font-weight: 600; color: #059669; margin-bottom: 8px;">💡 当前运行环境：Web / 移动端</div>
-                <div>当前处于浏览器或移动端环境，无需且不支持调用外部 Pandoc。<br/>建议直接选择左侧的 <strong>独立离线网页、Word 文档、PDF 打印或 Markdown</strong>，内置引擎无需任何配置，开箱即用！</div>
-              `;
-            } else {
-              rawPreview.innerHTML = `
-                <div style="font-weight: 600; margin-bottom: 8px;">⚙️ Pandoc 终端执行指令预览:</div>
-                <div style="background: rgba(0,0,0,0.06); padding: 8px 12px; border-radius: 6px; font-family: monospace;">
-                  ${escapeHtml(settings.pandocPath)} "${escapeHtml(baseName)}.md" -s -o "${escapeHtml(baseName)}.epub" --metadata title="${escapeHtml(article.title)}"
-                </div>
-                <div class="ee-pandoc-guide-box">
-                  <div class="ee-pandoc-guide-title">
-                    <span>🔍 桌面端 Pandoc 检测与安装指引</span>
-                  </div>
-                  <div>当前配置路径: <code>${escapeHtml(settings.pandocPath)}</code></div>
-                  <div style="margin-top: 8px;">如您的系统尚未安装 Pandoc，可通过以下方式一键安装：</div>
-                  <div style="margin-top: 6px;"><strong>macOS (Homebrew):</strong></div>
-                  <div class="ee-pandoc-cmd-snippet">
-                    <code>brew install pandoc</code>
-                  </div>
-                  <div><strong>Windows (Winget):</strong></div>
-                  <div class="ee-pandoc-cmd-snippet">
-                    <code>winget install JohnMacFarlane.Pandoc</code>
-                  </div>
-                  <div style="margin-top: 6px;">官方安装包下载: <a href="https://pandoc.org/installing.html" target="_blank" style="color: #059669;">pandoc.org/installing.html</a></div>
-                </div>
-              `;
-            }
+            rawPreview.innerHTML = `
+              <div style="font-weight: 600; margin-bottom: 8px; color: var(--ee-export-primary);">⚙️ Pandoc 终端执行指令预览:</div>
+              <div style="background: rgba(0,0,0,0.06); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px;">
+                ${escapeHtml(settings.pandocPath)} "${escapeHtml(baseName)}.md" -s -o "${escapeHtml(baseName)}.epub" --metadata title="${escapeHtml(article.title)}"
+              </div>
+              <div style="color: var(--ee-export-text-muted); font-size: 12px; line-height: 1.6;">
+                💡 提示：如需查看桌面端 Pandoc 环境检测及完整安装指引，可在插件设置中查看，或在命令面板运行 <strong>「Pandoc 环境检测与安装指引」</strong> 命令。
+              </div>
+            `;
           } else {
             rawPreview.textContent = article.rawMarkdown;
             btnExport.textContent = "📥 导出 Markdown 文件";
@@ -1416,11 +1297,10 @@ export default {
 
       // 复制内容
       btnCopy.onclick = async () => {
-        const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
         let textToCopy = "";
 
         if (selectedFormat === "html") {
-          textToCopy = generateStandaloneHtml(article, themeConfig, { fontSize: selectedFontSize });
+          textToCopy = generateStandaloneHtml(article, { fontSize: selectedFontSize });
         } else if (selectedFormat === "hugo") {
           textToCopy = generateHugoMarkdown(article, article.rawMarkdown);
         } else if (selectedFormat === "doc") {
@@ -1440,13 +1320,12 @@ export default {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
         const baseName = (fileNameInput.value || article.title || "Note").trim();
         const outputFileName = `${baseName}${fmtObj.ext}`;
-        const themeConfig = THEMES[selectedTheme] || THEMES["github-light"];
 
         btnExport.disabled = true;
 
         try {
           if (selectedFormat === "html") {
-            const html = generateStandaloneHtml(article, themeConfig, { fontSize: selectedFontSize });
+            const html = generateStandaloneHtml(article, { fontSize: selectedFontSize });
             downloadFile(html, outputFileName, fmtObj.mime);
             context.ui?.showNotice?.(`独立网页 ${outputFileName} 导出成功！`);
             setTimeout(closeModal, 600);
@@ -1456,7 +1335,7 @@ export default {
             context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！双击直接在 Word / WPS 中编辑。`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "pdf") {
-            const printHtml = generateStandaloneHtml(article, themeConfig, { fontSize: selectedFontSize });
+            const printHtml = generateStandaloneHtml(article, { fontSize: selectedFontSize });
             triggerPrintViaIframe(printHtml, context);
             closeModal();
           } else if (selectedFormat === "md") {
@@ -1483,13 +1362,117 @@ export default {
       };
     }
 
-    // ==================== 12. 注册命令与入口位置优化 ====================
+    // ==================== 12. Pandoc 环境检测与安装指引对话框 ====================
+    function openPandocGuideModal() {
+      document.querySelectorAll(".edgeever-export-modal-backdrop").forEach((el) => el.remove());
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "edgeever-export-modal-backdrop";
+
+      backdrop.innerHTML = `
+        <div class="ee-pandoc-dialog">
+          <div class="ee-pandoc-dialog-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">⚙️</span>
+              <strong style="font-size: 15px;">Pandoc 环境检测与安装指引</strong>
+            </div>
+            <button type="button" class="edgeever-export-modal-close-btn" title="关闭 (Esc)">✕</button>
+          </div>
+          <div class="ee-pandoc-dialog-body">
+            ${
+              !isDesktop
+                ? `
+              <div class="ee-pandoc-status-badge is-ok">
+                <span>🌐 当前环境：Web / 移动端</span>
+              </div>
+              <p style="margin: 0 0 10px 0;">当前 EdgeEver 运行在浏览器或移动设备环境中，由于沙盒权限限制，无需且不支持调用本地 Pandoc 二进制可执行文件。</p>
+              <p style="margin: 0; color: var(--ee-export-text-muted);">
+                ✨ <strong>温馨提示：</strong>本插件内置的 <strong>独立网页 (.html)、Word 文档 (.doc)、PDF 打印与 Markdown (.md)</strong> 均由内置的高性能 JavaScript 渲染引擎原生驱动，无需任何第三方依赖与配置，随时随地开箱即用！
+              </p>
+            `
+                : `
+              <div class="ee-pandoc-status-badge is-warn">
+                <span>💻 当前环境：桌面客户端 (Desktop)</span>
+              </div>
+              <p style="margin: 0 0 8px 0;">
+                当前配置路径: <code style="background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px;">${escapeHtml(
+                  settings.pandocPath
+                )}</code>
+              </p>
+              <p style="margin: 0 0 12px 0; color: var(--ee-export-text-muted); font-size: 12px;">
+                Pandoc 是强大的开源文档格式转换利器。如您需要导出为 EPUB、LaTeX、Typst 等学术格式，请确保系统中已安装 Pandoc：
+              </p>
+
+              <div style="font-weight: 600; font-size: 12px; margin-top: 10px;">🍏 macOS 一键安装 (Homebrew):</div>
+              <div class="ee-pandoc-code-box">
+                <code>brew install pandoc</code>
+                <button type="button" class="ee-pandoc-copy-btn" data-copy="brew install pandoc">复制</button>
+              </div>
+
+              <div style="font-weight: 600; font-size: 12px; margin-top: 8px;">🪟 Windows 一键安装 (Winget / Chocolatey):</div>
+              <div class="ee-pandoc-code-box">
+                <code>winget install JohnMacFarlane.Pandoc</code>
+                <button type="button" class="ee-pandoc-copy-btn" data-copy="winget install JohnMacFarlane.Pandoc">复制</button>
+              </div>
+
+              <div style="font-weight: 600; font-size: 12px; margin-top: 8px;">🐧 Linux (Ubuntu / Debian):</div>
+              <div class="ee-pandoc-code-box">
+                <code>sudo apt install pandoc</code>
+                <button type="button" class="ee-pandoc-copy-btn" data-copy="sudo apt install pandoc">复制</button>
+              </div>
+
+              <div style="margin-top: 12px; font-size: 12px;">
+                🌐 官方安装包下载:
+                <a href="https://pandoc.org/installing.html" target="_blank" rel="noopener noreferrer" style="color: var(--ee-export-primary); font-weight: 600; text-decoration: underline;">
+                  pandoc.org/installing.html
+                </a>
+              </div>
+            `
+            }
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+              <button type="button" class="edgeever-btn edgeever-btn-primary ee-close-dialog-btn" style="padding: 7px 18px;">我知道了</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(backdrop);
+
+      const closeDialog = () => backdrop.remove();
+      backdrop.querySelector(".edgeever-export-modal-close-btn").onclick = closeDialog;
+      backdrop.querySelector(".ee-close-dialog-btn").onclick = closeDialog;
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) closeDialog();
+      };
+
+      backdrop.querySelectorAll(".ee-pandoc-copy-btn").forEach((btn) => {
+        btn.onclick = async () => {
+          const cmd = btn.dataset.copy;
+          if (cmd) {
+            await copyToClipboard(cmd, context);
+            btn.textContent = "已复制";
+            setTimeout(() => (btn.textContent = "复制"), 1500);
+          }
+        };
+      });
+    }
+
+    // ==================== 13. 注册命令与入口位置优化 ====================
     context.commands.register({
       id: "enhancing-export-open",
       title: "增强导出 (Enhancing Export)...",
       listed: true,
       run() {
         openExportModal();
+      },
+    });
+
+    context.commands.register({
+      id: "enhancing-export-pandoc-guide",
+      title: "Pandoc 环境检测与安装指引",
+      listed: true,
+      run() {
+        openPandocGuideModal();
       },
     });
 
@@ -1513,7 +1496,6 @@ export default {
       };
 
       if (settings.buttonPosition === "toolbar") {
-        // 尝试寻找编辑器的格式工具栏（包含 bold/italic/list 那一行）
         const formattingToolbar =
           document.querySelector(".edgeever-editor-toolbar") ||
           document.querySelector('[role="toolbar"]') ||
