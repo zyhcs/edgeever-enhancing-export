@@ -25,18 +25,18 @@
   --ee-export-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 
-/* 顶部/工具栏快捷触发按钮 */
+/* 快捷触发按钮 - 工具栏嵌入风格 */
 .edgeever-enhancing-export-trigger-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  font-size: 13px;
+  padding: 5px 11px;
+  font-size: 12.5px;
   font-weight: 550;
   color: var(--ee-export-text);
   background: var(--ee-export-bg-subtle);
   border: 1px solid var(--ee-export-border);
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   transition: all 0.16s ease;
   user-select: none;
@@ -50,7 +50,29 @@
   transform: translateY(-1px);
 }
 
-.edgeever-enhancing-export-trigger-btn:active {
+/* 快捷触发按钮 - 右下角悬浮胶囊风格 (FAB) 绝对不遮挡顶部 */
+.edgeever-enhancing-export-trigger-btn.is-fab {
+  position: fixed;
+  bottom: 26px;
+  right: 28px;
+  z-index: 990;
+  padding: 8px 15px;
+  font-size: 13px;
+  border-radius: 999px;
+  background: var(--ee-export-primary);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.edgeever-enhancing-export-trigger-btn.is-fab:hover {
+  background: var(--ee-export-primary-hover);
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.45);
+  transform: translateY(-2px);
+}
+
+.edgeever-enhancing-export-trigger-btn.is-fab:active {
   transform: translateY(0);
 }
 
@@ -64,7 +86,7 @@
 .edgeever-export-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 99999;
@@ -82,9 +104,9 @@
 
 /* 弹窗主体（大尺寸宽屏体验） */
 .edgeever-export-modal {
-  width: 1100px;
+  width: 1120px;
   max-width: 96vw;
-  height: 86vh;
+  height: 88vh;
   background: var(--ee-export-bg-modal);
   border: 1px solid var(--ee-export-border);
   border-radius: 18px;
@@ -309,7 +331,7 @@
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
-/* 胶囊按钮组（主题、字号） */
+/* 胶囊按钮组 */
 .edgeever-segment-group {
   display: flex;
   gap: 5px;
@@ -486,19 +508,18 @@
 /* 纸张容器 */
 .edgeever-live-preview-paper {
   width: 100%;
-  max-width: 680px;
+  max-width: 720px;
   min-height: 100%;
   background: #ffffff;
   color: #1f2328;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 36px 32px 60px 32px;
+  padding: 40px 36px 64px 36px;
   box-sizing: border-box;
   transition: all 0.2s ease;
   line-height: 1.7;
 }
 
-/* 纸张内部排版元素 */
 .edgeever-live-preview-paper .preview-title {
   font-size: 2em;
   font-weight: 750;
@@ -553,7 +574,7 @@
 .edgeever-live-preview-paper th,
 .edgeever-live-preview-paper td {
   border: 1px solid var(--ee-export-border);
-  padding: 6px 12px;
+  padding: 7px 12px;
   text-align: left;
 }
 
@@ -570,30 +591,81 @@
   border-radius: 0 6px 6px 0;
 }
 
-.edgeever-live-preview-paper pre {
-  margin: 1.2em 0;
-  padding: 12px 14px;
-  background: var(--ee-export-bg-subtle);
-  border: 1px solid var(--ee-export-border);
-  border-radius: 8px;
-  overflow-x: auto;
+/* ==================== 代码块高保真 Mac 风格与高亮样式 ==================== */
+.ee-code-block-wrapper {
+  margin: 1.4em 0;
+  background: #1e1e24;
+  border: 1px solid #33333d;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.ee-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ee-code-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ee-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ee-dot-red { background: #ff5f56; }
+.ee-dot-yellow { background: #ffbd2e; }
+.ee-dot-green { background: #27c93f; }
+
+.ee-code-lang {
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.86em;
-  line-height: 1.5;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.05em;
 }
 
-.edgeever-live-preview-paper code {
-  font-family: SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.88em;
+.ee-code-pre {
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  overflow-x: auto;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace !important;
+  font-size: 12.5px !important;
+  line-height: 1.6 !important;
+  background: transparent !important;
+  border: none !important;
 }
 
-.edgeever-live-preview-paper hr {
-  border: none;
-  border-top: 1px solid var(--ee-export-border);
-  margin: 1.8em 0;
+.ee-code-pre code {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+  color: #e6edf3;
 }
 
-/* 针对纯文本模式（Markdown / Pandoc）的代码预览 */
+/* 语法着色 Token 类 (Light / Dark 响应) */
+.hl-keyword { color: #d2a8ff; font-weight: 600; }
+.hl-string { color: #a5d6ff; }
+.hl-comment { color: #8b949e; font-style: italic; }
+.hl-number { color: #79c0ff; }
+.hl-function { color: #f0883e; }
+.hl-abap-system-var { color: #ff7b72; font-weight: 600; }
+.hl-operator { color: #79c0ff; }
+
+/* 纯文本代码与 Pandoc 命令行预览 */
 .edgeever-raw-preview-text {
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
@@ -608,6 +680,39 @@
   width: 100%;
   max-width: 720px;
   box-sizing: border-box;
+}
+
+/* Pandoc 安装检测与指引卡片 */
+.ee-pandoc-guide-box {
+  background: var(--ee-export-bg-subtle);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.ee-pandoc-guide-title {
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ee-export-text);
+  margin-bottom: 8px;
+}
+
+.ee-pandoc-cmd-snippet {
+  background: var(--ee-export-bg-modal);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  margin: 4px 0 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 /* 打印与 PDF 专用的页面样式 */

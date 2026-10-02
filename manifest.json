@@ -2,14 +2,14 @@
   "type": "plugin",
   "id": "org.edgeever.plugins.enhancing-export",
   "name": "Enhancing Export",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "apiVersion": "2",
   "settingsUi": "host",
-  "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML, Markdown (Standard & Hugo), Word (.docx), PDF, and Pandoc formats with customized styling and typography.",
+  "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc/.docx), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with customizable styling.",
   "locales": {
     "zh-CN": {
       "name": "增强导出 (Enhancing Export)",
-      "description": "参考 obsidian-enhancing-export 打造的专业级多格式增强导出插件。支持将 EdgeEver 笔记导出为带独立完整样式的 HTML、纯净与博客 Markdown (Hugo/Hexo)、Word 文档 (.docx)、可定制边距与字号的高保真 PDF 以及全景长图卡片，并支持 Pandoc 模板命令扩展。"
+      "description": "参考 obsidian-enhancing-export 打造的专业级多格式增强导出插件。支持将 EdgeEver 笔记导出为带语法高亮与图片的独立 HTML、Word 文档 (.doc/docx)、纯净与博客 Markdown (Hugo/Hexo)、高保真可调 PDF 与 Pandoc 命令行扩展，支持实时排版预览与 Pandoc 智能检测指引。"
     }
   },
   "author": "zyhcs",
@@ -32,11 +32,11 @@
         "default": "html",
         "options": [
           { "value": "html", "label": "独立离线网页 (.html)" },
+          { "value": "doc", "label": "Word 文档 (.doc / 兼容 docx)" },
+          { "value": "pdf", "label": "高保真排版打印 / PDF" },
           { "value": "md", "label": "纯净标准 Markdown (.md)" },
           { "value": "hugo", "label": "博客 Markdown (Hugo/Hexo)" },
-          { "value": "docx", "label": "Word 文档 (.docx)" },
-          { "value": "pdf", "label": "高保真排版打印 / PDF" },
-          { "value": "png", "label": "长图分享卡片 (.png)" }
+          { "value": "pandoc", "label": "Pandoc 学术与扩展格式" }
         ]
       },
       {
@@ -66,9 +66,20 @@
         ]
       },
       {
+        "key": "button_position",
+        "type": "select",
+        "label": "增强导出快捷入口按钮位置",
+        "default": "bottom-right",
+        "options": [
+          { "value": "bottom-right", "label": "右下角悬浮胶囊按钮 (推荐，绝不遮挡操作)" },
+          { "value": "toolbar", "label": "嵌入编辑器格式工具栏末尾" },
+          { "value": "hidden", "label": "隐藏按钮 (仅通过快捷键或命令面板唤出)" }
+        ]
+      },
+      {
         "key": "embed_images_base64",
         "type": "boolean",
-        "label": "HTML/Docx 默认内联本地图片为 Base64（离线不丢图）",
+        "label": "HTML/Word 默认内联本地图片为 Base64（离线不丢图）",
         "default": true
       },
       {
@@ -78,15 +89,9 @@
         "default": true
       },
       {
-        "key": "show_toolbar_button",
-        "type": "boolean",
-        "label": "在笔记页面右上角显示「增强导出」快捷入口",
-        "default": true
-      },
-      {
         "key": "pandoc_path",
         "type": "text",
-        "label": "Pandoc 可执行文件路径（可选，未安装时无需填写）",
+        "label": "Pandoc 可执行文件路径 (仅桌面端客户端有效)",
         "default": "pandoc"
       }
     ]
