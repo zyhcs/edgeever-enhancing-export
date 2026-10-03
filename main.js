@@ -1,7 +1,7 @@
 /**
  * EdgeEver Enhancing Export Plugin
  * 专业级多格式增强导出插件 (Inspired by obsidian-enhancing-export)
- * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌与宽度自适应、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印、页面排版自定义（宽度/页边距/页码/水印）及 Pandoc 智能检测指引。
+ * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌与自适应版心、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印、页面排版自定义（宽度/页边距/页头独立开关/页尾独立开关/水印）及 Pandoc 智能检测指引。
  */
 
 // ==================== 1. 专业级代码语法高亮引擎 ====================
@@ -572,7 +572,13 @@ function generateStandaloneHtml(article, options = {}) {
   const contentWidth = options.contentWidth || "820px";
   const watermarkText = (options.watermark || "").trim();
   const watermarkSvg = generateWatermarkSvg(watermarkText);
-  const showPageNumber = options.showPageNumber !== false;
+
+  // 页头与页尾：有就有，没有就没有
+  const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
+  const headerText = hasHeader ? options.headerText.trim() : "";
+
+  const hasFooter = Boolean(options.enableFooter && options.footerText && options.footerText.trim());
+  const footerText = hasFooter ? options.footerText.trim() : "";
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -607,6 +613,16 @@ function generateStandaloneHtml(article, options = {}) {
       margin: 0 auto;
       padding: 48px 28px 80px 28px;
       position: relative;
+    }
+    .ee-header {
+      border-bottom: 1px solid var(--ee-border);
+      padding-bottom: 8px;
+      margin-bottom: 24px;
+      font-size: 0.85em;
+      color: var(--ee-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     .ee-title {
       font-size: 2.1em;
@@ -746,46 +762,41 @@ function generateStandaloneHtml(article, options = {}) {
     }
     .ee-footer {
       margin-top: 56px;
-      padding-top: 20px;
+      padding-top: 14px;
       border-top: 1px solid var(--ee-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.82em;
+      text-align: center;
+      font-size: 0.85em;
       color: var(--ee-muted);
     }
     @media print {
       @page {
         size: A4;
         margin: ${options.marginMm ? `${options.marginMm}mm` : "20mm"};
-        @bottom-center {
-          content: counter(page);
-        }
+        ${hasHeader ? `@top-right { content: "${escapeHtml(headerText)}"; }` : ""}
+        ${hasFooter ? `@bottom-center { content: "${escapeHtml(footerText)}"; }` : ""}
       }
       body { background: #ffffff !important; color: #000000 !important; font-size: 11pt !important; }
       .ee-container { max-width: 100% !important; padding: 0 !important; }
       .ee-code-block-wrapper, blockquote, table, img { page-break-inside: avoid; }
-      .ee-footer { display: flex; }
+      ${!hasHeader ? ".ee-header { display: none !important; }" : ""}
+      ${!hasFooter ? ".ee-footer { display: none !important; }" : ""}
     }
   </style>
 </head>
 <body>
   <div class="ee-container">
+    ${hasHeader ? `<header class="ee-header"><span>${escapeHtml(headerText)}</span></header>` : ""}
     <h1 class="ee-title">${escapeHtml(title || "无标题笔记")}</h1>
     <main class="ee-content">
       ${contentHtml}
     </main>
-    <footer class="ee-footer">
-      <span>由 EdgeEver 增强导出生成 · ${new Date().toLocaleDateString()}</span>
-      ${showPageNumber ? "<span>第 1 页</span>" : ""}
-    </footer>
+    ${hasFooter ? `<footer class="ee-footer"><span>${escapeHtml(footerText)}</span></footer>` : ""}
   </div>
 </body>
 </html>`;
 }
 
 // ==================== 7. Word (.doc) 兼容导出与图片防溢出 ====================
-// 为 Word 深度优化图片：利用包裹容器与单元格边界，强力约束图片 100% 居中缩放自适应版心，绝不超出版面
 function adaptImagesForWord(html) {
   if (!html) return "";
   return html.replace(/<img\b([^>]*?)>/gi, (_match, attrs) => {
@@ -809,7 +820,13 @@ function generateWordDocument(article, htmlContent, options = {}) {
   const marginPt = options.marginPt || 56.7; // 标准边距 56.7pt (20mm)
   const watermarkText = (options.watermark || "").trim();
   const watermarkSvg = generateWatermarkSvg(watermarkText);
-  const showPageNumber = options.showPageNumber !== false;
+
+  // 页头与页尾：有就有，没有就没有
+  const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
+  const headerText = hasHeader ? options.headerText.trim() : "";
+
+  const hasFooter = Boolean(options.enableFooter && options.footerText && options.footerText.trim());
+  const footerText = hasFooter ? options.footerText.trim() : "";
 
   return `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -841,11 +858,19 @@ function generateWordDocument(article, htmlContent, options = {}) {
       color: #111111;
       ${watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
     }
+    .word-header {
+      border-bottom: 0.75pt solid #cbd5e0;
+      padding-bottom: 4.0pt;
+      margin-bottom: 18.0pt;
+      font-size: 9.0pt;
+      color: #718096;
+      text-align: right;
+    }
     h1.doc-title {
       font-size: 22.0pt;
       font-weight: bold;
       color: #0f172a;
-      margin-top: 12.0pt;
+      margin-top: 10.0pt;
       margin-bottom: 18.0pt;
       border-bottom: 1.5pt solid #cbd5e0;
       padding-bottom: 8.0pt;
@@ -892,8 +917,8 @@ function generateWordDocument(article, htmlContent, options = {}) {
     }
     .word-footer {
       margin-top: 36.0pt;
-      border-top: 0.5pt solid #cbd5e0;
-      padding-top: 10.0pt;
+      border-top: 0.75pt solid #cbd5e0;
+      padding-top: 8.0pt;
       font-size: 9.0pt;
       color: #718096;
       text-align: center;
@@ -902,15 +927,10 @@ function generateWordDocument(article, htmlContent, options = {}) {
 </head>
 <body>
   <div class="Section1">
+    ${hasHeader ? `<div class="word-header"><p style="margin:0;">${escapeHtml(headerText)}</p></div>` : ""}
     <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
     ${wordSafeHtml}
-    ${
-      showPageNumber
-        ? `<div class="word-footer">
-            <p>第 <span style='mso-field-code:" PAGE "'>1</span> 页 / 共 <span style='mso-field-code:" NUMPAGES "'>1</span> 页</p>
-          </div>`
-        : ""
-    }
+    ${hasFooter ? `<div class="word-footer"><p style="margin:0;">${escapeHtml(footerText)}</p></div>` : ""}
   </div>
 </body>
 </html>`;
@@ -936,7 +956,6 @@ categories: []
 
 `;
 
-  // 清洗反斜杠下划线，去除旧的 frontmatter
   const cleaned = cleanEscapedUnderscores(rawMarkdown.replace(/^---\n[\s\S]*?\n---\n/, ""));
   return frontmatter + cleaned;
 }
@@ -1045,7 +1064,7 @@ const EXPORT_FORMATS = [
     ext: ".pdf",
     engine: "builtin",
     icon: "🖨️",
-    desc: "针对 A4 纸张排版优化，白底黑字、高亮代码块与页码，直接打印或存为 PDF。",
+    desc: "针对 A4 纸张排版优化，白底黑字、高亮代码块，直接打印或存为 PDF。",
     mime: "application/pdf",
   },
   {
@@ -1087,7 +1106,10 @@ export default {
       defaultFontSize: "15",
       defaultWidth: "820px",
       defaultMargin: "20mm",
-      showPageNumber: true,
+      enableHeader: false,
+      headerText: "",
+      enableFooter: false,
+      footerText: "第 1 页 / 共 1 页",
       watermarkText: "",
       buttonPosition: "toolbar",
       embedImagesBase64: true,
@@ -1180,7 +1202,14 @@ export default {
       let selectedWidth = settings.defaultWidth;
       let selectedMargin = settings.defaultMargin;
       let selectedWatermark = settings.watermarkText;
-      let selectedShowPageNumber = settings.showPageNumber;
+
+      // 页头与页尾分别独立配置（默认关闭，有就有，没有就没有）
+      let selectedEnableHeader = settings.enableHeader;
+      let selectedHeaderText = settings.headerText || article.title || "";
+
+      let selectedEnableFooter = settings.enableFooter;
+      let selectedFooterText = settings.footerText || "第 1 页 / 共 1 页";
+
       let candidateFileName = (article.title || "Note").replace(/[\\/:*?"<>|]/g, "_");
 
       const backdrop = document.createElement("div");
@@ -1254,23 +1283,45 @@ export default {
                   </div>
                 </div>
 
+                <!-- 页头设置 (分别独立设置，有就有，没有就没有) -->
+                <div class="edgeever-form-group" id="ee-header-group">
+                  <div class="edgeever-checkbox-group" style="padding: 9px 11px;">
+                    <label class="edgeever-checkbox-label" style="font-weight: 600;">
+                      <input type="checkbox" id="ee-enable-header" ${selectedEnableHeader ? "checked" : ""} />
+                      <span>显示页头 (Header)</span>
+                    </label>
+                    <div id="ee-header-input-wrap" style="display: ${selectedEnableHeader ? "block" : "none"}; margin-top: 6px;">
+                      <input type="text" class="edgeever-input-text" id="ee-header-text" placeholder="页头内容，如：项目设计方案" value="${escapeHtml(selectedHeaderText)}" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 页尾设置 (分别独立设置，有就有，没有就没有) -->
+                <div class="edgeever-form-group" id="ee-footer-group">
+                  <div class="edgeever-checkbox-group" style="padding: 9px 11px;">
+                    <label class="edgeever-checkbox-label" style="font-weight: 600;">
+                      <input type="checkbox" id="ee-enable-footer" ${selectedEnableFooter ? "checked" : ""} />
+                      <span>显示页尾 (Footer)</span>
+                    </label>
+                    <div id="ee-footer-input-wrap" style="display: ${selectedEnableFooter ? "block" : "none"}; margin-top: 6px;">
+                      <input type="text" class="edgeever-input-text" id="ee-footer-text" placeholder="页尾内容，如：第 1 页 / 共 1 页" value="${escapeHtml(selectedFooterText)}" />
+                    </div>
+                  </div>
+                </div>
+
                 <!-- 背景安全水印 -->
                 <div class="edgeever-form-group" id="ee-watermark-group">
                   <label class="edgeever-form-label">
                     背景安全水印
                     <span class="edgeever-form-hint">留空不显示</span>
                   </label>
-                  <input type="text" class="edgeever-input-text" id="ee-watermark-input" placeholder="如：内部资料 / 机密文档" value="${escapeHtml(selectedWatermark)}" />
+                  <input type="text" class="edgeever-input-text" id="ee-watermark-input" placeholder="如：内部资料 / 绝密" value="${escapeHtml(selectedWatermark)}" />
                 </div>
 
                 <!-- 高级选项 -->
                 <div class="edgeever-form-group">
-                  <label class="edgeever-form-label">排版与文档选项</label>
+                  <label class="edgeever-form-label">高级选项</label>
                   <div class="edgeever-checkbox-group">
-                    <label class="edgeever-checkbox-label">
-                      <input type="checkbox" id="ee-opt-page-num" ${selectedShowPageNumber ? "checked" : ""} />
-                      <span>包含底端居中页码 (PDF / Word)</span>
-                    </label>
                     <label class="edgeever-checkbox-label">
                       <input type="checkbox" id="ee-opt-embed-img" ${settings.embedImagesBase64 ? "checked" : ""} />
                       <span>自动内嵌本地图片 Base64 (离线不丢图)</span>
@@ -1299,10 +1350,16 @@ export default {
                 </div>
               </div>
               <div class="edgeever-preview-viewport">
-                <!-- 真实纸张画布 (无任何时间/标签等多余元数据) -->
+                <!-- 真实纸张画布 -->
                 <div class="edgeever-live-preview-paper" id="ee-live-paper">
+                  <!-- 动态页头 -->
+                  <div class="ee-paper-header" id="ee-preview-header-bar" style="display: none;"></div>
+                  <!-- 大标题 -->
                   <h1 class="preview-title">${escapeHtml(article.title || "无标题笔记")}</h1>
+                  <!-- 正文 -->
                   <div class="preview-content-body">${article.contentHtml}</div>
+                  <!-- 动态页尾 -->
+                  <div class="ee-paper-footer" id="ee-preview-footer-bar" style="display: none;"></div>
                 </div>
                 <!-- 纯文本与 Pandoc 预览 -->
                 <div class="edgeever-raw-preview-text" id="ee-raw-preview" style="display: none;"></div>
@@ -1319,7 +1376,12 @@ export default {
       const widthSegments = backdrop.querySelector("#ee-width-segments");
       const marginSegments = backdrop.querySelector("#ee-margin-segments");
       const watermarkInput = backdrop.querySelector("#ee-watermark-input");
-      const optPageNum = backdrop.querySelector("#ee-opt-page-num");
+      const enableHeaderCheck = backdrop.querySelector("#ee-enable-header");
+      const headerInputWrap = backdrop.querySelector("#ee-header-input-wrap");
+      const headerTextInput = backdrop.querySelector("#ee-header-text");
+      const enableFooterCheck = backdrop.querySelector("#ee-enable-footer");
+      const footerInputWrap = backdrop.querySelector("#ee-footer-input-wrap");
+      const footerTextInput = backdrop.querySelector("#ee-footer-text");
       const fileNameInput = backdrop.querySelector("#ee-filename-input");
       const extHint = backdrop.querySelector("#ee-ext-hint");
       const widthHint = backdrop.querySelector("#ee-width-hint");
@@ -1327,6 +1389,8 @@ export default {
       const previewMarginPill = backdrop.querySelector("#ee-preview-margin-pill");
       const previewSizePill = backdrop.querySelector("#ee-preview-size-pill");
       const livePaper = backdrop.querySelector("#ee-live-paper");
+      const previewHeaderBar = backdrop.querySelector("#ee-preview-header-bar");
+      const previewFooterBar = backdrop.querySelector("#ee-preview-footer-bar");
       const rawPreview = backdrop.querySelector("#ee-raw-preview");
       const btnExport = backdrop.querySelector("#ee-btn-export");
       const btnCopy = backdrop.querySelector("#ee-btn-copy");
@@ -1395,9 +1459,28 @@ export default {
         updateUiState();
       });
 
-      // 页码勾选
-      optPageNum.addEventListener("change", () => {
-        selectedShowPageNumber = optPageNum.checked;
+      // 页头独立开关与文本
+      enableHeaderCheck.addEventListener("change", () => {
+        selectedEnableHeader = enableHeaderCheck.checked;
+        headerInputWrap.style.display = selectedEnableHeader ? "block" : "none";
+        updateUiState();
+      });
+
+      headerTextInput.addEventListener("input", () => {
+        selectedHeaderText = headerTextInput.value;
+        updateUiState();
+      });
+
+      // 页尾独立开关与文本
+      enableFooterCheck.addEventListener("change", () => {
+        selectedEnableFooter = enableFooterCheck.checked;
+        footerInputWrap.style.display = selectedEnableFooter ? "block" : "none";
+        updateUiState();
+      });
+
+      footerTextInput.addEventListener("input", () => {
+        selectedFooterText = footerTextInput.value;
+        updateUiState();
       });
 
       function updateUiState() {
@@ -1410,6 +1493,8 @@ export default {
         backdrop.querySelector("#ee-fontsize-group").style.display = isVisualFormat ? "flex" : "none";
         backdrop.querySelector("#ee-width-group").style.display = isVisualFormat ? "flex" : "none";
         backdrop.querySelector("#ee-margin-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-header-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-footer-group").style.display = isVisualFormat ? "flex" : "none";
         backdrop.querySelector("#ee-watermark-group").style.display = isVisualFormat ? "flex" : "none";
 
         previewSizePill.textContent = `${selectedFontSize}px`;
@@ -1423,11 +1508,29 @@ export default {
           livePaper.style.fontSize = `${selectedFontSize}px`;
           livePaper.style.maxWidth = selectedWidth;
 
-          // 根据边距动态设定内边距
+          // 边距动态内边距
           const padMap = { "12mm": "24px 24px 40px 24px", "20mm": "36px 36px 60px 36px", "28mm": "50px 50px 72px 50px" };
           livePaper.style.padding = padMap[selectedMargin] || "36px 36px 60px 36px";
 
-          // 水印背景实时联动
+          // 页头：有就有，没有就没有
+          if (selectedEnableHeader && selectedHeaderText.trim()) {
+            previewHeaderBar.style.display = "flex";
+            previewHeaderBar.textContent = selectedHeaderText.trim();
+          } else {
+            previewHeaderBar.style.display = "none";
+            previewHeaderBar.textContent = "";
+          }
+
+          // 页尾：有就有，没有就没有
+          if (selectedEnableFooter && selectedFooterText.trim()) {
+            previewFooterBar.style.display = "block";
+            previewFooterBar.textContent = selectedFooterText.trim();
+          } else {
+            previewFooterBar.style.display = "none";
+            previewFooterBar.textContent = "";
+          }
+
+          // 水印
           const wmSvg = generateWatermarkSvg(selectedWatermark);
           if (wmSvg) {
             livePaper.style.backgroundImage = `url("${wmSvg}")`;
@@ -1494,7 +1597,10 @@ export default {
           marginMm: marginMm,
           marginPt: ptMap[selectedMargin] || 56.7,
           watermark: selectedWatermark,
-          showPageNumber: selectedShowPageNumber,
+          enableHeader: selectedEnableHeader,
+          headerText: selectedHeaderText,
+          enableFooter: selectedEnableFooter,
+          footerText: selectedFooterText,
         };
       }
 
@@ -1537,7 +1643,7 @@ export default {
           } else if (selectedFormat === "doc") {
             const docContent = generateWordDocument(article, article.contentHtml, opts);
             downloadFile(docContent, outputFileName, fmtObj.mime);
-            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！图片已自动自适应版心，可在 Word / WPS 中顺畅浏览。`);
+            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！可在 Word / WPS 中顺畅浏览。`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "pdf") {
             const printHtml = generateStandaloneHtml(article, opts);
