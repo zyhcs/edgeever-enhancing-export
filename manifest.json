@@ -2,7 +2,7 @@
   "type": "plugin",
   "id": "org.edgeever.plugins.enhancing-export",
   "name": "Enhancing Export",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "apiVersion": "2",
   "settingsUi": "host",
   "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with elegant white typography.",
@@ -35,8 +35,7 @@
           { "value": "doc", "label": "Word 文档 (.doc / 原生兼容)" },
           { "value": "pdf", "label": "高保真排版打印 / PDF" },
           { "value": "md", "label": "纯净标准 Markdown (.md)" },
-          { "value": "hugo", "label": "博客 Markdown (Hugo/Hexo)" },
-          { "value": "pandoc", "label": "Pandoc 学术与扩展格式" }
+          { "value": "hugo", "label": "博客 Markdown (Hugo/Hexo)" }
         ]
       },
       {

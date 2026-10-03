@@ -599,6 +599,66 @@ function renderMarkdownToHtml(markdown) {
 
 // ==================== 6. 打印与 Office 辅助生成器 ====================
 
+// 针对 PDF 打印的前景真实 DOM 水印网格生成器（保证无论用户是否勾选“背景图形”，打印均 100% 出现）
+function generatePrintWatermarkGridHtml(watermarkText, watermarkMode) {
+  if (!watermarkText) return "";
+  const clean = escapeHtml(watermarkText);
+  const count = watermarkMode === "tile-dense" ? 12 : 6;
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    items.push(`<div class="ee-watermark-grid-cell"><span>${clean}</span></div>`);
+  }
+  return items.join("\n");
+}
+
+// 针对 Word (.doc) 的脱离文档流绝对定位背景水印层（Mac Word、Windows Word、WPS 100% 呈现，且高度为 0，不占正文行高）
+function generateWordWatermarkLayer(watermarkText, watermarkMode) {
+  if (!watermarkText) return "";
+  const clean = escapeHtml(watermarkText);
+
+  if (watermarkMode === "center-stamp") {
+    // 居中大印章：零高度容器 + 绝对定位居中，大标题紧靠顶部开始
+    return `
+      <div style="position: absolute; left: 0; right: 0; top: 220pt; text-align: center; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: -1;">
+        <table border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto; border: none; background: transparent;">
+          <tr>
+            <td align="center" style="border: 2.5pt dashed #cbd5e0; padding: 12pt 36pt; border-radius: 10pt; font-size: 32pt; font-weight: bold; color: #cbd5e0; letter-spacing: 5pt; font-family: 'Microsoft YaHei', 'SimSun', sans-serif;">
+              ${clean}
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
+
+  // 平铺与水平模式：4 行跨越整页的绝对定位行，完全脱离正文排版流
+  const rows = [
+    { top: "120pt", left: "20pt" },
+    { top: "300pt", left: "60pt" },
+    { top: "480pt", left: "20pt" },
+    { top: "660pt", left: "60pt" },
+  ];
+
+  const deg = watermarkMode === "horizontal" ? 0 : -25;
+  const size = watermarkMode === "tile-dense" ? "20pt" : "24pt";
+
+  const rowsHtml = rows
+    .map(
+      (r) => `
+    <div style="position: absolute; top: ${r.top}; left: ${r.left}; width: 100%; font-size: ${size}; font-weight: bold; color: #cbd5e0; letter-spacing: 3pt; font-family: 'Microsoft YaHei', 'SimSun', sans-serif; transform: rotate(${deg}deg); -webkit-transform: rotate(${deg}deg);">
+      ${clean}
+    </div>
+  `
+    )
+    .join("\n");
+
+  return `
+    <div style="position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: -1;">
+      ${rowsHtml}
+    </div>
+  `;
+}
+
 // 针对 PDF 打印的 CSS Paged Media 计数器生成器
 function generateCssPrintCounterContent(footerText) {
   if (!footerText) return '""';
@@ -622,7 +682,7 @@ function generateCssPrintCounterContent(footerText) {
   return JSON.stringify(text);
 }
 
-// 针对 Word (.doc) 的原生 VML 底层防选中只读水印生成器
+// 针对 Word (.doc) 的原生 VML 底层只读水印（Windows Word 备用双保险）
 function generateWordVmlWatermark(watermarkText, watermarkMode) {
   if (!watermarkText) return "";
   const cleanText = escapeHtml(watermarkText);
@@ -659,27 +719,6 @@ function generateWordVmlWatermark(watermarkText, watermarkMode) {
         fillcolor="#94a3b8" stroked="f">
         <v:fill opacity="0.15"/>
         <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:22pt;font-weight:bold' string="${cleanText}"/>
-      </v:shape>
-    `
-      )
-      .join("\n");
-  } else if (watermarkMode === "tile-dense") {
-    const points = [
-      { top: "80pt", left: "-60pt" },
-      { top: "80pt", left: "240pt" },
-      { top: "320pt", left: "-60pt" },
-      { top: "320pt", left: "240pt" },
-      { top: "560pt", left: "-60pt" },
-      { top: "560pt", left: "240pt" },
-    ];
-    shapes = points
-      .map(
-        (p, idx) => `
-      <v:shape id="WM_Dense_${idx}" type="#WordWatermarkShape"
-        style='position:absolute;left:${p.left};top:${p.top};width:250pt;height:70pt;z-index:-251657216;rotation:-28'
-        fillcolor="#94a3b8" stroked="f">
-        <v:fill opacity="0.13"/>
-        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:18pt;font-weight:bold' string="${cleanText}"/>
       </v:shape>
     `
       )
@@ -957,7 +996,7 @@ function generateStandaloneHtml(article, options = {}) {
       z-index: 1;
     }
 
-    /* 打印专用水印全屏固定图层（默认隐藏，打印时激活） */
+    /* 屏幕预览时隐藏打印专用水印层，打印时激活 */
     .ee-print-watermark-overlay {
       display: none;
     }
@@ -982,49 +1021,63 @@ function generateStandaloneHtml(article, options = {}) {
         padding: 0 !important;
         margin: 0 !important;
       }
-      /* 打印时正文流中的页头和页尾彻底隐藏，防止与 @page margin boxes 重复！ */
       .ee-header,
       .ee-footer {
         display: none !important;
       }
-      /* 打印专用水印全屏固定层：position: fixed 使其在每一页自动被打印机重复渲染！ */
+      /* 打印专用前景水印固定层：position: fixed 使其在每一页物理纸张均被打印机强制渲染！ */
       .ee-print-watermark-overlay {
-        display: block !important;
+        display: flex !important;
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
         pointer-events: none !important;
-        z-index: -9999 !important;
+        z-index: 9999 !important;
+        opacity: 0.13 !important;
+        mix-blend-mode: multiply !important;
+        flex-wrap: wrap !important;
+        justify-content: space-around !important;
+        align-content: space-around !important;
+        overflow: hidden !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      .ee-print-watermark-tile {
-        width: 100% !important;
-        height: 100% !important;
-        background-repeat: repeat !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+      .ee-watermark-grid-cell {
+        width: 32% !important;
+        height: 24% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
       }
-      .ee-print-watermark-stamp {
-        position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) rotate(-28deg) !important;
+      .ee-watermark-grid-cell span {
+        transform: rotate(${watermarkMode === "horizontal" ? 0 : -28}deg) !important;
+        font-size: ${watermarkMode === "tile-dense" ? "16pt" : "20pt"} !important;
+        font-weight: 700 !important;
+        color: #334155 !important;
+        white-space: nowrap !important;
+        letter-spacing: 0.05em !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      }
+      .ee-print-stamp-box {
+        margin: auto !important;
+        transform: rotate(-28deg) !important;
         font-size: 38pt !important;
         font-weight: 800 !important;
-        color: rgba(100, 116, 139, 0.16) !important;
-        border: 3.5pt dashed rgba(100, 116, 139, 0.2) !important;
+        color: #334155 !important;
+        border: 3.5pt dashed #334155 !important;
         padding: 12pt 36pt !important;
         border-radius: 12pt !important;
-        text-transform: uppercase !important;
         letter-spacing: 0.1em !important;
         white-space: nowrap !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       }
-      /* 超长代码块平滑断页 */
+      .ee-center-stamp-watermark {
+        display: none !important;
+      }
       .ee-code-block-wrapper {
         page-break-inside: auto !important;
         break-inside: auto !important;
@@ -1037,12 +1090,12 @@ function generateStandaloneHtml(article, options = {}) {
   </style>
 </head>
 <body>
-  <!-- 打印与屏幕通用全屏背景水印层 -->
+  <!-- 打印专用全屏前景固定水印层（利用 position: fixed + 前景真实文字，100% 抵抗浏览器关闭背景图形） -->
   ${hasWatermark ? `
   <div class="ee-print-watermark-overlay" aria-hidden="true">
     ${isCenterStamp 
-      ? `<div class="ee-print-watermark-stamp">${escapeHtml(watermarkText)}</div>` 
-      : `<div class="ee-print-watermark-tile" style="background-image: url('${watermarkSvg}');"></div>`
+      ? `<div class="ee-print-stamp-box">${escapeHtml(watermarkText)}</div>` 
+      : generatePrintWatermarkGridHtml(watermarkText, watermarkMode)
     }
   </div>
   ` : ""}
@@ -1060,7 +1113,7 @@ function generateStandaloneHtml(article, options = {}) {
 </html>`;
 }
 
-// ==================== 8. Word (.doc) 兼容导出与原生 VML 水印 ====================
+// ==================== 8. Word (.doc) 兼容导出与零高度绝对定位水印 ====================
 function adaptImagesForWord(html) {
   if (!html) return "";
   return html.replace(/<img\b([^>]*?)>/gi, (_match, attrs) => {
@@ -1227,8 +1280,9 @@ function generateWordDocument(article, htmlContent, options = {}) {
     ` : `<p class="MsoFooter" style="margin:0; line-height:0; font-size:1pt;">&nbsp;</p>`}
   </div>
 
-  <!-- 正文区域：纯粹干净，首个元素直接为大标题，无任何多余占位元素 -->
+  <!-- 正文区域：包含全端支持的零高度绝对定位水印，大标题正常从顶部起始，绝不占行高 -->
   <div class="Section1">
+    ${hasWatermark ? generateWordWatermarkLayer(watermarkText, watermarkMode) : ""}
     <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
     ${wordSafeHtml}
   </div>
@@ -1384,15 +1438,6 @@ const EXPORT_FORMATS = [
     icon: "🚀",
     desc: "自动补充 YAML Frontmatter（标题、时间、标签），适配静态博客流水线。",
     mime: "text/markdown;charset=utf-8",
-  },
-  {
-    id: "pandoc",
-    name: "Pandoc 学术与扩展",
-    ext: ".epub",
-    engine: "pandoc",
-    icon: "⚙️",
-    desc: "基于 Pandoc 命令行导出为 EPUB、LaTeX、Typst 等高级格式（一键生成命令）。",
-    mime: "text/plain",
   },
 ];
 
