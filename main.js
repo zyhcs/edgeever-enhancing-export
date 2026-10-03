@@ -1,7 +1,7 @@
 /**
  * EdgeEver Enhancing Export Plugin
  * 专业级多格式增强导出插件 (Inspired by obsidian-enhancing-export)
- * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印及 Pandoc 智能检测指引。
+ * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌与宽度自适应、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印、页面排版自定义（宽度/页边距/页码/水印）及 Pandoc 智能检测指引。
  */
 
 // ==================== 1. 专业级代码语法高亮引擎 ====================
@@ -138,7 +138,7 @@ function highlightCode(code, lang) {
   return result;
 }
 
-// ==================== 2. 标准白色优雅排版设计定义 ====================
+// ==================== 2. 标准白色排版与水印生成器 ====================
 const WHITE_STYLE = {
   bg: "#ffffff",
   text: "#1f2328",
@@ -151,7 +151,32 @@ const WHITE_STYLE = {
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
 };
 
-// ==================== 3. 图片提取与 Base64 转换器 ====================
+// 动态 SVG 倾斜平铺水印背景
+function generateWatermarkSvg(text) {
+  if (!text || !text.trim()) return "";
+  const clean = escapeHtml(text.trim());
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200'><text x='30' y='120' fill='rgba(100,116,139,0.09)' font-size='17' font-family='sans-serif' font-weight='600' transform='rotate(-28 160 100)'>${clean}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// ==================== 3. 文本清洗与反斜杠下划线还原 ====================
+// 保护代码块，将普通文本中多余的转义 \_ 彻底还原为干净原生的 _
+function cleanEscapedUnderscores(markdown) {
+  if (!markdown) return "";
+  const codeBlocks = [];
+  let text = markdown.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (match) => {
+    const placeholder = `__EE_CODE_CLEAN_PROTECT_${codeBlocks.length}__`;
+    codeBlocks.push(match);
+    return placeholder;
+  });
+
+  // 将所有 \_ 还原为纯净的下划线 _
+  text = text.replace(/\\_/g, "_");
+
+  return text.replace(/__EE_CODE_CLEAN_PROTECT_(\d+)__/g, (_m, idx) => codeBlocks[Number(idx)] || "");
+}
+
+// ==================== 4. 图片提取与 Base64 转换器 ====================
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -275,11 +300,12 @@ async function resolveAllImagesInMarkdown(rawMarkdown, context) {
   return result;
 }
 
-// ==================== 4. 高保真 Markdown 解析与渲染引擎 ====================
+// ==================== 5. 高保真 Markdown 解析与渲染引擎 ====================
 function renderMarkdownToHtml(markdown) {
   if (!markdown) return "";
 
-  let md = markdown.replace(/\r\n/g, "\n");
+  // 预清洗：保护代码块，还原普通文本中被转义的下划线
+  let md = cleanEscapedUnderscores(markdown.replace(/\r\n/g, "\n"));
 
   // 1. 抽取并保护代码块
   const codeBlocks = [];
@@ -289,7 +315,7 @@ function renderMarkdownToHtml(markdown) {
     return placeholder;
   });
 
-  // 2. 抽取并保护独立与行内数学公式
+  // 2. 抽取并保护数学公式
   const mathBlocks = [];
   md = md.replace(/\$\$([\s\S]*?)\$\$/g, (_m, math) => {
     const placeholder = `__EE_MATH_BLOCK_${mathBlocks.length}__`;
@@ -358,7 +384,7 @@ function renderMarkdownToHtml(markdown) {
     });
 
     s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
-      return `<img src="${src}" alt="${alt}" class="ee-img" loading="lazy" />`;
+      return `<img src="${src}" alt="${alt}" class="ee-img" loading="lazy" style="max-width: 100%; height: auto; display: block; margin: 1.2em auto;" />`;
     });
 
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
@@ -371,9 +397,11 @@ function renderMarkdownToHtml(markdown) {
 
     s = s.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
     s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
     s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    s = s.replace(/_([^_]+)_/g, "<em>$1</em>");
+
+    // 严谨匹配斜体：禁止匹配单词内部下划线（如 WS_REVERSE_GOODS_ISSUE 绝不触发斜体！）
+    s = s.replace(/(?:^|\s)_([^_]+)_(?=\s|$)/g, " <em>$1</em> ");
+
     s = s.replace(/~~([^~]+)~~/g, "<del>$1</del>");
     s = s.replace(/==([^=]+)==/g, "<mark>$1</mark>");
     s = s.replace(/(?:^|\s)#([a-zA-Z0-9_\u4e00-\u9fa5]+)/g, ' <span class="ee-tag">#$1</span>');
@@ -537,17 +565,14 @@ function renderMarkdownToHtml(markdown) {
   return finalHtml;
 }
 
-// ==================== 5. 独立 HTML 导出生成器 (含全量内联 CSS 与高亮) ====================
+// ==================== 6. 独立 HTML 导出生成器 ====================
 function generateStandaloneHtml(article, options = {}) {
-  const { title, contentHtml, updatedAt, tags, notebook } = article;
+  const { title, contentHtml } = article;
   const fontSize = options.fontSize || 15;
-  const metaItems = [
-    notebook ? `<span>📁 ${escapeHtml(notebook)}</span>` : "",
-    updatedAt ? `<span>🕒 更新于 ${escapeHtml(updatedAt)}</span>` : "",
-    tags && tags.length > 0 ? `<span>🏷️ ${tags.map((t) => `#${escapeHtml(t)}`).join(" ")}</span>` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const contentWidth = options.contentWidth || "820px";
+  const watermarkText = (options.watermark || "").trim();
+  const watermarkSvg = generateWatermarkSvg(watermarkText);
+  const showPageNumber = options.showPageNumber !== false;
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -575,31 +600,23 @@ function generateStandaloneHtml(article, options = {}) {
       font-size: ${fontSize}px;
       line-height: 1.75;
       -webkit-font-smoothing: antialiased;
+      ${watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
     }
     .ee-container {
-      max-width: 820px;
+      max-width: ${contentWidth};
       margin: 0 auto;
       padding: 48px 28px 80px 28px;
-    }
-    .ee-article-header {
-      border-bottom: 1px solid var(--ee-border);
-      padding-bottom: 18px;
-      margin-bottom: 32px;
+      position: relative;
     }
     .ee-title {
       font-size: 2.1em;
       font-weight: 750;
       line-height: 1.25;
-      margin: 0 0 12px 0;
+      margin: 0 0 24px 0;
       color: var(--ee-text);
       letter-spacing: -0.02em;
-    }
-    .ee-meta {
-      font-size: 0.86em;
-      color: var(--ee-muted);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+      border-bottom: 1px solid var(--ee-border);
+      padding-bottom: 16px;
     }
     h1, h2, h3, h4, h5, h6 {
       color: var(--ee-text);
@@ -630,7 +647,15 @@ function generateStandaloneHtml(article, options = {}) {
     .ee-task-item { display: flex; align-items: baseline; gap: 8px; margin: 0.4em 0; }
     .ee-task-item input { accent-color: var(--ee-accent); }
     hr { border: none; border-top: 1px solid var(--ee-border); margin: 2.2em 0; }
-    .ee-img { max-width: 100%; height: auto; border-radius: 8px; margin: 1.2em 0; border: 1px solid var(--ee-border); display: block; }
+    .ee-img {
+      max-width: 100% !important;
+      height: auto !important;
+      border-radius: 8px;
+      margin: 1.4em auto;
+      border: 1px solid var(--ee-border);
+      display: block;
+      object-fit: contain;
+    }
     .ee-inline-code {
       font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 0.88em;
@@ -723,39 +748,69 @@ function generateStandaloneHtml(article, options = {}) {
       margin-top: 56px;
       padding-top: 20px;
       border-top: 1px solid var(--ee-border);
-      text-align: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       font-size: 0.82em;
       color: var(--ee-muted);
     }
     @media print {
-      @page { size: A4; margin: 15mm 20mm; }
+      @page {
+        size: A4;
+        margin: ${options.marginMm ? `${options.marginMm}mm` : "20mm"};
+        @bottom-center {
+          content: counter(page);
+        }
+      }
       body { background: #ffffff !important; color: #000000 !important; font-size: 11pt !important; }
       .ee-container { max-width: 100% !important; padding: 0 !important; }
       .ee-code-block-wrapper, blockquote, table, img { page-break-inside: avoid; }
-      .ee-footer { display: none; }
+      .ee-footer { display: flex; }
     }
   </style>
 </head>
 <body>
   <div class="ee-container">
-    <header class="ee-article-header">
-      <h1 class="ee-title">${escapeHtml(title || "无标题笔记")}</h1>
-      ${metaItems ? `<div class="ee-meta">${metaItems}</div>` : ""}
-    </header>
+    <h1 class="ee-title">${escapeHtml(title || "无标题笔记")}</h1>
     <main class="ee-content">
       ${contentHtml}
     </main>
     <footer class="ee-footer">
-      由 EdgeEver 增强导出生成 · ${new Date().toLocaleDateString()}
+      <span>由 EdgeEver 增强导出生成 · ${new Date().toLocaleDateString()}</span>
+      ${showPageNumber ? "<span>第 1 页</span>" : ""}
     </footer>
   </div>
 </body>
 </html>`;
 }
 
-// ==================== 6. Word (.doc) 兼容导出生成器 ====================
-function generateWordDocument(article, htmlContent) {
-  const { title, notebook } = article;
+// ==================== 7. Word (.doc) 兼容导出与图片防溢出 ====================
+// 为 Word 深度优化图片：利用包裹容器与单元格边界，强力约束图片 100% 居中缩放自适应版心，绝不超出版面
+function adaptImagesForWord(html) {
+  if (!html) return "";
+  return html.replace(/<img\b([^>]*?)>/gi, (_match, attrs) => {
+    let cleanAttrs = attrs.replace(/\b(width|height)=["'][^"']*["']/gi, "");
+    cleanAttrs = cleanAttrs.replace(/\bstyle=["'][^"']*["']/gi, "");
+    return `<div style="text-align: center; margin: 12pt 0; max-width: 100%;">
+      <table border="0" cellspacing="0" cellpadding="0" style="width: 100%; max-width: 100%; border: none;">
+        <tr>
+          <td align="center" style="border: none; padding: 0;">
+            <img ${cleanAttrs} style="max-width: 100%; width: auto; max-height: 520pt; height: auto; border: 1pt solid #e2e8f0; display: block;" width="520" />
+          </td>
+        </tr>
+      </table>
+    </div>`;
+  });
+}
+
+function generateWordDocument(article, htmlContent, options = {}) {
+  const { title } = article;
+  const wordSafeHtml = adaptImagesForWord(htmlContent);
+  const marginPt = options.marginPt || 56.7; // 标准边距 56.7pt (20mm)
+  const watermarkText = (options.watermark || "").trim();
+  const watermarkSvg = generateWatermarkSvg(watermarkText);
+  const showPageNumber = options.showPageNumber !== false;
+
   return `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
@@ -773,7 +828,7 @@ function generateWordDocument(article, htmlContent) {
   <style>
     @page Section1 {
       size: 595.3pt 841.9pt;
-      margin: 56.7pt 56.7pt 56.7pt 56.7pt;
+      margin: ${marginPt}pt ${marginPt}pt ${marginPt}pt ${marginPt}pt;
       mso-header-margin: 36.0pt;
       mso-footer-margin: 36.0pt;
       mso-paper-source: 0;
@@ -784,10 +839,20 @@ function generateWordDocument(article, htmlContent) {
       font-size: 11.0pt;
       line-height: 1.6;
       color: #111111;
+      ${watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
     }
-    h1 { font-size: 21.0pt; font-weight: bold; color: #1a202c; margin-top: 18.0pt; margin-bottom: 8.0pt; }
-    h2 { font-size: 15.5pt; font-weight: bold; color: #2d3748; margin-top: 14.0pt; margin-bottom: 6.0pt; }
-    h3 { font-size: 13.0pt; font-weight: bold; color: #4a5568; margin-top: 10.0pt; margin-bottom: 4.0pt; }
+    h1.doc-title {
+      font-size: 22.0pt;
+      font-weight: bold;
+      color: #0f172a;
+      margin-top: 12.0pt;
+      margin-bottom: 18.0pt;
+      border-bottom: 1.5pt solid #cbd5e0;
+      padding-bottom: 8.0pt;
+    }
+    h1 { font-size: 18.0pt; font-weight: bold; color: #1a202c; margin-top: 16.0pt; margin-bottom: 8.0pt; }
+    h2 { font-size: 14.5pt; font-weight: bold; color: #2d3748; margin-top: 13.0pt; margin-bottom: 6.0pt; }
+    h3 { font-size: 12.5pt; font-weight: bold; color: #4a5568; margin-top: 10.0pt; margin-bottom: 4.0pt; }
     p { margin: 6.0pt 0; }
     table { width: 100%; border-collapse: collapse; margin: 12.0pt 0; }
     th, td { border: 1.0pt solid #cbd5e0; padding: 6.0pt 9.0pt; text-align: left; }
@@ -819,22 +884,39 @@ function generateWordDocument(article, htmlContent) {
     .hl-number { color: #79c0ff; }
     .hl-function { color: #f0883e; }
     .hl-abap-system-var { color: #ff7b72; font-weight: bold; }
-    img { max-width: 100%; height: auto; }
+    /* 图片适应版心 */
+    img {
+      max-width: 100% !important;
+      width: auto !important;
+      height: auto !important;
+    }
+    .word-footer {
+      margin-top: 36.0pt;
+      border-top: 0.5pt solid #cbd5e0;
+      padding-top: 10.0pt;
+      font-size: 9.0pt;
+      color: #718096;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <div class="Section1">
-    <h1>${escapeHtml(title || "无标题笔记")}</h1>
-    <p style="color: #718096; font-size: 9.5pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 6pt; margin-bottom: 16pt;">
-      ${notebook ? `文件夹: ${escapeHtml(notebook)} | ` : ""}导出时间: ${new Date().toLocaleString()}
-    </p>
-    ${htmlContent}
+    <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
+    ${wordSafeHtml}
+    ${
+      showPageNumber
+        ? `<div class="word-footer">
+            <p>第 <span style='mso-field-code:" PAGE "'>1</span> 页 / 共 <span style='mso-field-code:" NUMPAGES "'>1</span> 页</p>
+          </div>`
+        : ""
+    }
   </div>
 </body>
 </html>`;
 }
 
-// ==================== 7. 博客 Markdown 导出生成器 ====================
+// ==================== 8. 博客 Markdown 导出生成器 ====================
 function generateHugoMarkdown(article, rawMarkdown) {
   const { title, tags, createdAt, updatedAt } = article;
   const nowStr = new Date().toISOString();
@@ -854,11 +936,12 @@ categories: []
 
 `;
 
-  const cleanContent = rawMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
-  return frontmatter + cleanContent;
+  // 清洗反斜杠下划线，去除旧的 frontmatter
+  const cleaned = cleanEscapedUnderscores(rawMarkdown.replace(/^---\n[\s\S]*?\n---\n/, ""));
+  return frontmatter + cleaned;
 }
 
-// ==================== 8. 文件下载、隐式 IFrame 打印与剪贴板 ====================
+// ==================== 9. 文件下载、隐式 IFrame 打印与剪贴板 ====================
 function downloadFile(content, fileName, mimeType = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -936,7 +1019,7 @@ async function copyToClipboard(text, context) {
   }
 }
 
-// ==================== 9. 导出预设格式定义 ====================
+// ==================== 10. 导出预设格式定义 ====================
 const EXPORT_FORMATS = [
   {
     id: "html",
@@ -944,7 +1027,7 @@ const EXPORT_FORMATS = [
     ext: ".html",
     engine: "builtin",
     icon: "🌐",
-    desc: "将样式、排版与所有本地图片全部内嵌 Base64，离线随处双击完美呈现。",
+    desc: "将排版、样式与图片全部内嵌 Base64，离线随处双击完美自适应打开。",
     mime: "text/html;charset=utf-8",
   },
   {
@@ -953,7 +1036,7 @@ const EXPORT_FORMATS = [
     ext: ".doc",
     engine: "builtin",
     icon: "📄",
-    desc: "高保真 Word 规范文档，表格、代码高亮与内嵌图片完备，Word / WPS 完美原生打开。",
+    desc: "高保真 Word 规范文档，图片严格缩放自适应版心不超页，Word/WPS 完美打开。",
     mime: "application/msword;charset=utf-8",
   },
   {
@@ -962,7 +1045,7 @@ const EXPORT_FORMATS = [
     ext: ".pdf",
     engine: "builtin",
     icon: "🖨️",
-    desc: "针对 A4 纸张排版优化，白底黑字与高亮代码块，直接打印或另存为高清 PDF。",
+    desc: "针对 A4 纸张排版优化，白底黑字、高亮代码块与页码，直接打印或存为 PDF。",
     mime: "application/pdf",
   },
   {
@@ -971,7 +1054,7 @@ const EXPORT_FORMATS = [
     ext: ".md",
     engine: "builtin",
     icon: "📝",
-    desc: "符合通用 CommonMark 规范的 Markdown 文本，方便在任何外部工具中编辑。",
+    desc: "符合通用规范的 Markdown 文本，自动清洗反斜杠，保留纯正下划线与内容。",
     mime: "text/markdown;charset=utf-8",
   },
   {
@@ -980,7 +1063,7 @@ const EXPORT_FORMATS = [
     ext: ".md",
     engine: "builtin",
     icon: "🚀",
-    desc: "自动补充 YAML Frontmatter（标题、时间、标签、分类），适配静态博客发布。",
+    desc: "自动补充 YAML Frontmatter（标题、时间、标签），适配静态博客流水线。",
     mime: "text/markdown;charset=utf-8",
   },
   {
@@ -994,7 +1077,7 @@ const EXPORT_FORMATS = [
   },
 ];
 
-// ==================== 10. 核心插件生命周期 ====================
+// ==================== 11. 核心插件生命周期 ====================
 export default {
   activate(context) {
     const isDesktop = typeof window !== "undefined" && Boolean(window.edgeeverDesktop?.isAvailable);
@@ -1002,6 +1085,10 @@ export default {
     let settings = {
       defaultFormat: "html",
       defaultFontSize: "15",
+      defaultWidth: "820px",
+      defaultMargin: "20mm",
+      showPageNumber: true,
+      watermarkText: "",
       buttonPosition: "toolbar",
       embedImagesBase64: true,
       includeFrontmatter: true,
@@ -1063,11 +1150,13 @@ export default {
         console.warn("[Enhancing Export] resolveAllImagesInMarkdown error:", err);
       }
 
-      const contentHtml = renderMarkdownToHtml(markdownWithImages);
+      // 预清洗下划线
+      const cleanedMarkdown = cleanEscapedUnderscores(markdownWithImages);
+      const contentHtml = renderMarkdownToHtml(cleanedMarkdown);
 
       return {
         title,
-        rawMarkdown: markdownWithImages,
+        rawMarkdown: cleanedMarkdown,
         contentHtml,
         tags,
         notebook,
@@ -1076,7 +1165,7 @@ export default {
       };
     }
 
-    // ==================== 11. 导出交互向导弹窗 ====================
+    // ==================== 12. 导出交互向导弹窗 ====================
     async function openExportModal() {
       document.querySelectorAll(".edgeever-export-modal-backdrop").forEach((el) => el.remove());
 
@@ -1088,6 +1177,10 @@ export default {
 
       let selectedFormat = settings.defaultFormat;
       let selectedFontSize = settings.defaultFontSize;
+      let selectedWidth = settings.defaultWidth;
+      let selectedMargin = settings.defaultMargin;
+      let selectedWatermark = settings.watermarkText;
+      let selectedShowPageNumber = settings.showPageNumber;
       let candidateFileName = (article.title || "Note").replace(/[\\/:*?"<>|]/g, "_");
 
       const backdrop = document.createElement("div");
@@ -1101,7 +1194,7 @@ export default {
               <div class="edgeever-export-modal-icon">📤</div>
               <div>
                 <h3 class="edgeever-export-modal-title">增强导出 (Enhancing Export)</h3>
-                <div class="edgeever-export-modal-subtitle">左侧调整排版参数，右侧实时所见即所得预览</div>
+                <div class="edgeever-export-modal-subtitle">左侧调整排版参数，右侧实时所见即所得纸张预览</div>
               </div>
             </div>
             <button type="button" class="edgeever-export-modal-close-btn" title="关闭 (Esc)">✕</button>
@@ -1137,17 +1230,50 @@ export default {
                   </div>
                 </div>
 
+                <!-- 页面内容显示宽度 -->
+                <div class="edgeever-form-group" id="ee-width-group">
+                  <label class="edgeever-form-label">
+                    页面内容显示宽度
+                    <span class="edgeever-form-hint" id="ee-width-hint">820px</span>
+                  </label>
+                  <div class="edgeever-segment-group" id="ee-width-segments">
+                    <button type="button" class="edgeever-segment-btn" data-width="720px">720px</button>
+                    <button type="button" class="edgeever-segment-btn" data-width="820px">820px</button>
+                    <button type="button" class="edgeever-segment-btn" data-width="960px">960px</button>
+                    <button type="button" class="edgeever-segment-btn" data-width="100%">全宽</button>
+                  </div>
+                </div>
+
+                <!-- 页边距 -->
+                <div class="edgeever-form-group" id="ee-margin-group">
+                  <label class="edgeever-form-label">页面边距 (PDF / Word)</label>
+                  <div class="edgeever-segment-group" id="ee-margin-segments">
+                    <button type="button" class="edgeever-segment-btn" data-margin="12mm" data-pt="34" data-pad="24px">窄边距 (12mm)</button>
+                    <button type="button" class="edgeever-segment-btn" data-margin="20mm" data-pt="56.7" data-pad="36px">标准 (20mm)</button>
+                    <button type="button" class="edgeever-segment-btn" data-margin="28mm" data-pt="80" data-pad="50px">宽边距 (28mm)</button>
+                  </div>
+                </div>
+
+                <!-- 背景安全水印 -->
+                <div class="edgeever-form-group" id="ee-watermark-group">
+                  <label class="edgeever-form-label">
+                    背景安全水印
+                    <span class="edgeever-form-hint">留空不显示</span>
+                  </label>
+                  <input type="text" class="edgeever-input-text" id="ee-watermark-input" placeholder="如：内部资料 / 机密文档" value="${escapeHtml(selectedWatermark)}" />
+                </div>
+
                 <!-- 高级选项 -->
                 <div class="edgeever-form-group">
-                  <label class="edgeever-form-label">高级选项</label>
+                  <label class="edgeever-form-label">排版与文档选项</label>
                   <div class="edgeever-checkbox-group">
+                    <label class="edgeever-checkbox-label">
+                      <input type="checkbox" id="ee-opt-page-num" ${selectedShowPageNumber ? "checked" : ""} />
+                      <span>包含底端居中页码 (PDF / Word)</span>
+                    </label>
                     <label class="edgeever-checkbox-label">
                       <input type="checkbox" id="ee-opt-embed-img" ${settings.embedImagesBase64 ? "checked" : ""} />
                       <span>自动内嵌本地图片 Base64 (离线不丢图)</span>
-                    </label>
-                    <label class="edgeever-checkbox-label">
-                      <input type="checkbox" id="ee-opt-frontmatter" ${settings.includeFrontmatter ? "checked" : ""} />
-                      <span>包含文章元数据 (Frontmatter / 标签)</span>
                     </label>
                   </div>
                 </div>
@@ -1167,19 +1293,15 @@ export default {
               <div class="edgeever-preview-header">
                 <span style="font-weight: 600;">📄 实时排版预览</span>
                 <div class="preview-badge-group">
-                  <span class="preview-pill">经典纯白优雅排版</span>
+                  <span class="preview-pill" id="ee-preview-width-pill">宽度 820px</span>
+                  <span class="preview-pill" id="ee-preview-margin-pill">边距 20mm</span>
                   <span class="preview-pill" id="ee-preview-size-pill">15px</span>
                 </div>
               </div>
               <div class="edgeever-preview-viewport">
-                <!-- 真实纸张画布 -->
+                <!-- 真实纸张画布 (无任何时间/标签等多余元数据) -->
                 <div class="edgeever-live-preview-paper" id="ee-live-paper">
                   <h1 class="preview-title">${escapeHtml(article.title || "无标题笔记")}</h1>
-                  <div class="preview-meta">
-                    ${article.notebook ? `<span>📁 ${escapeHtml(article.notebook)}</span>` : ""}
-                    ${article.updatedAt ? `<span>🕒 ${escapeHtml(article.updatedAt)}</span>` : ""}
-                    ${article.tags && article.tags.length > 0 ? `<span>🏷️ ${article.tags.map((t) => `#${escapeHtml(t)}`).join(" ")}</span>` : ""}
-                  </div>
                   <div class="preview-content-body">${article.contentHtml}</div>
                 </div>
                 <!-- 纯文本与 Pandoc 预览 -->
@@ -1194,8 +1316,15 @@ export default {
 
       const cardsList = backdrop.querySelector(".edgeever-export-cards-list");
       const fontSizeSegments = backdrop.querySelector("#ee-fontsize-segments");
+      const widthSegments = backdrop.querySelector("#ee-width-segments");
+      const marginSegments = backdrop.querySelector("#ee-margin-segments");
+      const watermarkInput = backdrop.querySelector("#ee-watermark-input");
+      const optPageNum = backdrop.querySelector("#ee-opt-page-num");
       const fileNameInput = backdrop.querySelector("#ee-filename-input");
       const extHint = backdrop.querySelector("#ee-ext-hint");
+      const widthHint = backdrop.querySelector("#ee-width-hint");
+      const previewWidthPill = backdrop.querySelector("#ee-preview-width-pill");
+      const previewMarginPill = backdrop.querySelector("#ee-preview-margin-pill");
       const previewSizePill = backdrop.querySelector("#ee-preview-size-pill");
       const livePaper = backdrop.querySelector("#ee-live-paper");
       const rawPreview = backdrop.querySelector("#ee-raw-preview");
@@ -1203,7 +1332,6 @@ export default {
       const btnCopy = backdrop.querySelector("#ee-btn-copy");
       const btnClose = backdrop.querySelector(".edgeever-export-modal-close-btn");
 
-      // 清空卡片列表，防止任何意外重复追加
       cardsList.innerHTML = "";
       EXPORT_FORMATS.forEach((fmt) => {
         const card = document.createElement("div");
@@ -1228,6 +1356,7 @@ export default {
         cardsList.appendChild(card);
       });
 
+      // 字号切换
       fontSizeSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
         if (btn.dataset.size === selectedFontSize) btn.classList.add("is-active");
         btn.onclick = () => {
@@ -1238,19 +1367,74 @@ export default {
         };
       });
 
+      // 宽度切换
+      widthSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
+        if (btn.dataset.width === selectedWidth) btn.classList.add("is-active");
+        btn.onclick = () => {
+          selectedWidth = btn.dataset.width;
+          widthSegments.querySelectorAll(".edgeever-segment-btn").forEach((b) => b.classList.remove("is-active"));
+          btn.classList.add("is-active");
+          updateUiState();
+        };
+      });
+
+      // 边距切换
+      marginSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
+        if (btn.dataset.margin === selectedMargin) btn.classList.add("is-active");
+        btn.onclick = () => {
+          selectedMargin = btn.dataset.margin;
+          marginSegments.querySelectorAll(".edgeever-segment-btn").forEach((b) => b.classList.remove("is-active"));
+          btn.classList.add("is-active");
+          updateUiState();
+        };
+      });
+
+      // 水印输入
+      watermarkInput.addEventListener("input", () => {
+        selectedWatermark = watermarkInput.value;
+        updateUiState();
+      });
+
+      // 页码勾选
+      optPageNum.addEventListener("change", () => {
+        selectedShowPageNumber = optPageNum.checked;
+      });
+
       function updateUiState() {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
         extHint.textContent = fmtObj.ext;
+        widthHint.textContent = selectedWidth;
 
         const isVisualFormat = selectedFormat === "html" || selectedFormat === "doc" || selectedFormat === "pdf";
 
         backdrop.querySelector("#ee-fontsize-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-width-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-margin-group").style.display = isVisualFormat ? "flex" : "none";
+        backdrop.querySelector("#ee-watermark-group").style.display = isVisualFormat ? "flex" : "none";
+
         previewSizePill.textContent = `${selectedFontSize}px`;
+        previewWidthPill.textContent = `宽度 ${selectedWidth}`;
+        previewMarginPill.textContent = `边距 ${selectedMargin}`;
 
         if (isVisualFormat) {
           livePaper.style.display = "block";
           rawPreview.style.display = "none";
+
           livePaper.style.fontSize = `${selectedFontSize}px`;
+          livePaper.style.maxWidth = selectedWidth;
+
+          // 根据边距动态设定内边距
+          const padMap = { "12mm": "24px 24px 40px 24px", "20mm": "36px 36px 60px 36px", "28mm": "50px 50px 72px 50px" };
+          livePaper.style.padding = padMap[selectedMargin] || "36px 36px 60px 36px";
+
+          // 水印背景实时联动
+          const wmSvg = generateWatermarkSvg(selectedWatermark);
+          if (wmSvg) {
+            livePaper.style.backgroundImage = `url("${wmSvg}")`;
+            livePaper.style.backgroundRepeat = "repeat";
+          } else {
+            livePaper.style.backgroundImage = "none";
+          }
 
           if (selectedFormat === "pdf") {
             btnExport.textContent = "🖨️ 打开打印 / 保存 PDF";
@@ -1278,7 +1462,7 @@ export default {
               </div>
             `;
           } else {
-            rawPreview.textContent = article.rawMarkdown;
+            rawPreview.textContent = cleanEscapedUnderscores(article.rawMarkdown);
             btnExport.textContent = "📥 导出 Markdown 文件";
           }
         }
@@ -1300,21 +1484,36 @@ export default {
       };
       window.addEventListener("keydown", handleKeyDown);
 
+      // 获取当前排版参数对象
+      function getLayoutOptions() {
+        const marginMm = parseInt(selectedMargin, 10) || 20;
+        const ptMap = { "12mm": 34, "20mm": 56.7, "28mm": 80 };
+        return {
+          fontSize: selectedFontSize,
+          contentWidth: selectedWidth,
+          marginMm: marginMm,
+          marginPt: ptMap[selectedMargin] || 56.7,
+          watermark: selectedWatermark,
+          showPageNumber: selectedShowPageNumber,
+        };
+      }
+
       // 复制内容
       btnCopy.onclick = async () => {
         let textToCopy = "";
+        const opts = getLayoutOptions();
 
         if (selectedFormat === "html") {
-          textToCopy = generateStandaloneHtml(article, { fontSize: selectedFontSize });
+          textToCopy = generateStandaloneHtml(article, opts);
         } else if (selectedFormat === "hugo") {
           textToCopy = generateHugoMarkdown(article, article.rawMarkdown);
         } else if (selectedFormat === "doc") {
-          textToCopy = generateWordDocument(article, article.contentHtml);
+          textToCopy = generateWordDocument(article, article.contentHtml, opts);
         } else if (selectedFormat === "pandoc") {
           const baseName = (fileNameInput.value || article.title || "Note").trim();
           textToCopy = `${settings.pandocPath} "${baseName}.md" -s -o "${baseName}.epub"`;
         } else {
-          textToCopy = article.rawMarkdown;
+          textToCopy = cleanEscapedUnderscores(article.rawMarkdown);
         }
 
         await copyToClipboard(textToCopy, context);
@@ -1325,26 +1524,27 @@ export default {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
         const baseName = (fileNameInput.value || article.title || "Note").trim();
         const outputFileName = `${baseName}${fmtObj.ext}`;
+        const opts = getLayoutOptions();
 
         btnExport.disabled = true;
 
         try {
           if (selectedFormat === "html") {
-            const html = generateStandaloneHtml(article, { fontSize: selectedFontSize });
+            const html = generateStandaloneHtml(article, opts);
             downloadFile(html, outputFileName, fmtObj.mime);
             context.ui?.showNotice?.(`独立网页 ${outputFileName} 导出成功！`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "doc") {
-            const docContent = generateWordDocument(article, article.contentHtml);
+            const docContent = generateWordDocument(article, article.contentHtml, opts);
             downloadFile(docContent, outputFileName, fmtObj.mime);
-            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！双击直接在 Word / WPS 中编辑。`);
+            context.ui?.showNotice?.(`Word 文档 ${outputFileName} 导出成功！图片已自动自适应版心，可在 Word / WPS 中顺畅浏览。`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "pdf") {
-            const printHtml = generateStandaloneHtml(article, { fontSize: selectedFontSize });
+            const printHtml = generateStandaloneHtml(article, opts);
             triggerPrintViaIframe(printHtml, context);
             closeModal();
           } else if (selectedFormat === "md") {
-            downloadFile(article.rawMarkdown, outputFileName, fmtObj.mime);
+            downloadFile(cleanEscapedUnderscores(article.rawMarkdown), outputFileName, fmtObj.mime);
             context.ui?.showNotice?.(`Markdown 文档 ${outputFileName} 导出成功！`);
             setTimeout(closeModal, 600);
           } else if (selectedFormat === "hugo") {
@@ -1367,7 +1567,7 @@ export default {
       };
     }
 
-    // ==================== 12. Pandoc 环境检测与安装指引对话框 ====================
+    // ==================== 13. Pandoc 环境检测与安装指引对话框 ====================
     function openPandocGuideModal() {
       document.querySelectorAll(".edgeever-export-modal-backdrop").forEach((el) => el.remove());
 
@@ -1462,7 +1662,7 @@ export default {
       });
     }
 
-    // ==================== 13. 注册命令与入口位置优化 ====================
+    // ==================== 14. 注册命令与入口安全挂载 ====================
     context.commands.register({
       id: "enhancing-export-open",
       title: "增强导出 (Enhancing Export)...",
@@ -1481,7 +1681,6 @@ export default {
       },
     });
 
-    // ==================== 14. 触发按钮安全挂载与原生无缝融合 ====================
     let currentButtonEl = null;
 
     function cleanupButton() {
@@ -1497,7 +1696,6 @@ export default {
     }
 
     function findFormattingToolbar() {
-      // 1. 常见编辑器工具栏选择器
       const selectors = [
         ".edgeever-editor-toolbar",
         ".ProseMirror-menubar",
@@ -1511,7 +1709,6 @@ export default {
         if (el) return el;
       }
 
-      // 2. 启发式：查找包含多个按钮的格式化工具栏行
       const toolbars = document.querySelectorAll("div, nav, header");
       for (const tb of toolbars) {
         const btns = tb.querySelectorAll("button");
@@ -1529,7 +1726,7 @@ export default {
         return;
       }
 
-      // 核心防抖防死循环机制：如果按钮已在 DOM 树中并且正常连接，绝对不要重新创建！
+      // 如果按钮已挂载且连接在 DOM 树中，绝不重复创建，彻底杜绝闪烁
       if (currentButtonEl && currentButtonEl.isConnected) {
         return;
       }
@@ -1547,7 +1744,6 @@ export default {
       btn.id = "edgeever-enhancing-export-btn";
       btn.title = "增强导出 (HTML / Word / PDF / Markdown)";
 
-      // 高度贴合原生的精致矢量图标 (无任何多余文字)
       const svgIcon = `
         <svg viewBox="0 0 24 24">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1573,7 +1769,7 @@ export default {
         }
       }
 
-      // 悬浮模式 (或找不到工具栏时的安全后备模式，严格位于原生 AI 唤出按钮上方)
+      // 悬浮模式 (安全位于原生 AI 唤出按钮上方)
       btn.className = "edgeever-enhancing-export-trigger-btn is-fab";
       btn.innerHTML = svgIcon;
       document.body.appendChild(btn);
@@ -1582,7 +1778,6 @@ export default {
 
     let timer = null;
     const observer = new MutationObserver(() => {
-      // 只要按钮完好地挂在页面上，直接 return，避免任何闪烁和重绘死循环
       if (currentButtonEl && currentButtonEl.isConnected) {
         return;
       }

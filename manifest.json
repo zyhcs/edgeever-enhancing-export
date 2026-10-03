@@ -2,7 +2,7 @@
   "type": "plugin",
   "id": "org.edgeever.plugins.enhancing-export",
   "name": "Enhancing Export",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "apiVersion": "2",
   "settingsUi": "host",
   "description": "Professional multi-format export plugin inspired by obsidian-enhancing-export. Export EdgeEver notes to standalone HTML (with syntax highlighting & embedded images), Word (.doc), Markdown (Standard & Hugo), high-fidelity PDF, and Pandoc formats with elegant white typography.",
