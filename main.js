@@ -1,7 +1,7 @@
 /**
  * EdgeEver Enhancing Export Plugin
  * 专业级多格式增强导出插件 (Inspired by obsidian-enhancing-export)
- * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌与自适应版心、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印、页面排版自定义（宽度/页边距/页头独立开关/页尾独立开关/水印）及 Pandoc 智能检测指引。
+ * 深度适配 EdgeEver 笔记系统，提供纯净白色优雅排版、Mac 风格全语法高亮代码块、全量图片 Base64 内嵌与自适应版心、Word (.doc)、独立 HTML、纯净与博客 Markdown、高保真无弹窗 PDF 打印、页面排版自定义（宽度/页边距/页头独立开关/页尾独立开关/系统变量与多样化水印）及 Pandoc 智能检测指引。
  */
 
 // ==================== 1. 专业级代码语法高亮引擎 ====================
@@ -138,7 +138,7 @@ function highlightCode(code, lang) {
   return result;
 }
 
-// ==================== 2. 标准白色排版与水印生成器 ====================
+// ==================== 2. 标准白色排版与系统变量/多样化水印 ====================
 const WHITE_STYLE = {
   bg: "#ffffff",
   text: "#1f2328",
@@ -151,16 +151,49 @@ const WHITE_STYLE = {
   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
 };
 
-// 动态 SVG 倾斜平铺水印背景
-function generateWatermarkSvg(text) {
-  if (!text || !text.trim()) return "";
+// 系统变量解析器：支持 {date}, {time}, {datetime}, {title}, {user} 等动态占位符
+function resolveWatermarkVariables(template, article) {
+  if (!template) return "";
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const dateStr = `${year}-${month}-${day}`;
+
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const timeStr = `${hours}:${minutes}`;
+  const dtStr = `${dateStr} ${timeStr}`;
+
+  const titleStr = article?.title || "未命名笔记";
+
+  return template
+    .replace(/\{\{\s*date\s*\}\}|\{\s*date\s*\}/gi, dateStr)
+    .replace(/\{\{\s*time\s*\}\}|\{\s*time\s*\}/gi, timeStr)
+    .replace(/\{\{\s*datetime\s*\}\}|\{\s*datetime\s*\}/gi, dtStr)
+    .replace(/\{\{\s*title\s*\}\}|\{\s*title\s*\}/gi, titleStr)
+    .replace(/\{\{\s*(?:user|author)\s*\}\}|\{\s*(?:user|author)\s*\}/gi, "EdgeEver");
+}
+
+// 多样化水印生成器：支持密集平铺、稀疏平铺、水平平铺与居中大印章
+function generateWatermarkBackground(text, mode = "tile-dense") {
+  if (!text || !text.trim() || mode === "center-stamp") return "";
   const clean = escapeHtml(text.trim());
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200'><text x='30' y='120' fill='rgba(100,116,139,0.09)' font-size='17' font-family='sans-serif' font-weight='600' transform='rotate(-28 160 100)'>${clean}</text></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+
+  if (mode === "tile-sparse") {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='440' height='260'><text x='40' y='160' fill='rgba(100,116,139,0.08)' font-size='18' font-family='sans-serif' font-weight='600' transform='rotate(-26 220 130)'>${clean}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  } else if (mode === "horizontal") {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='150'><text x='30' y='90' fill='rgba(100,116,139,0.08)' font-size='16' font-family='sans-serif' font-weight='600'>${clean}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  } else {
+    // 默认密集倾斜平铺 (tile-dense)
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='250' height='150'><text x='25' y='95' fill='rgba(100,116,139,0.09)' font-size='16' font-family='sans-serif' font-weight='600' transform='rotate(-28 125 75)'>${clean}</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }
 }
 
 // ==================== 3. 文本清洗与反斜杠下划线还原 ====================
-// 保护代码块，将普通文本中多余的转义 \_ 彻底还原为干净原生的 _
 function cleanEscapedUnderscores(markdown) {
   if (!markdown) return "";
   const codeBlocks = [];
@@ -170,7 +203,7 @@ function cleanEscapedUnderscores(markdown) {
     return placeholder;
   });
 
-  // 将所有 \_ 还原为纯净的下划线 _
+  // 将所有 \_ 还原为纯净原生的下划线 _
   text = text.replace(/\\_/g, "_");
 
   return text.replace(/__EE_CODE_CLEAN_PROTECT_(\d+)__/g, (_m, idx) => codeBlocks[Number(idx)] || "");
@@ -304,7 +337,6 @@ async function resolveAllImagesInMarkdown(rawMarkdown, context) {
 function renderMarkdownToHtml(markdown) {
   if (!markdown) return "";
 
-  // 预清洗：保护代码块，还原普通文本中被转义的下划线
   let md = cleanEscapedUnderscores(markdown.replace(/\r\n/g, "\n"));
 
   // 1. 抽取并保护代码块
@@ -570,8 +602,12 @@ function generateStandaloneHtml(article, options = {}) {
   const { title, contentHtml } = article;
   const fontSize = options.fontSize || 15;
   const contentWidth = options.contentWidth || "820px";
-  const watermarkText = (options.watermark || "").trim();
-  const watermarkSvg = generateWatermarkSvg(watermarkText);
+
+  // 水印与显示方式
+  const watermarkText = (options.watermarkResolved || "").trim();
+  const watermarkMode = options.watermarkMode || "tile-dense";
+  const watermarkSvg = generateWatermarkBackground(watermarkText, watermarkMode);
+  const isCenterStamp = watermarkMode === "center-stamp" && Boolean(watermarkText);
 
   // 页头与页尾：有就有，没有就没有
   const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
@@ -768,6 +804,24 @@ function generateStandaloneHtml(article, options = {}) {
       font-size: 0.85em;
       color: var(--ee-muted);
     }
+    .ee-center-stamp-watermark {
+      position: absolute;
+      top: 42%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-24deg);
+      font-size: 42px;
+      font-weight: 800;
+      color: rgba(100, 116, 139, 0.12);
+      border: 3.5px dashed rgba(100, 116, 139, 0.16);
+      padding: 10px 30px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      z-index: 1;
+    }
     @media print {
       @page {
         size: A4;
@@ -785,6 +839,7 @@ function generateStandaloneHtml(article, options = {}) {
 </head>
 <body>
   <div class="ee-container">
+    ${isCenterStamp ? `<div class="ee-center-stamp-watermark">${escapeHtml(watermarkText)}</div>` : ""}
     ${hasHeader ? `<header class="ee-header"><span>${escapeHtml(headerText)}</span></header>` : ""}
     <h1 class="ee-title">${escapeHtml(title || "无标题笔记")}</h1>
     <main class="ee-content">
@@ -817,9 +872,13 @@ function adaptImagesForWord(html) {
 function generateWordDocument(article, htmlContent, options = {}) {
   const { title } = article;
   const wordSafeHtml = adaptImagesForWord(htmlContent);
-  const marginPt = options.marginPt || 56.7; // 标准边距 56.7pt (20mm)
-  const watermarkText = (options.watermark || "").trim();
-  const watermarkSvg = generateWatermarkSvg(watermarkText);
+  const marginPt = options.marginPt || 56.7;
+
+  // 水印与显示方式
+  const watermarkText = (options.watermarkResolved || "").trim();
+  const watermarkMode = options.watermarkMode || "tile-dense";
+  const watermarkSvg = generateWatermarkBackground(watermarkText, watermarkMode);
+  const isCenterStamp = watermarkMode === "center-stamp" && Boolean(watermarkText);
 
   // 页头与页尾：有就有，没有就没有
   const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
@@ -850,7 +909,7 @@ function generateWordDocument(article, htmlContent, options = {}) {
       mso-footer-margin: 36.0pt;
       mso-paper-source: 0;
     }
-    div.Section1 { page: Section1; }
+    div.Section1 { page: Section1; position: relative; }
     body {
       font-family: 'Calibri', 'Microsoft YaHei', 'SimSun', sans-serif;
       font-size: 11.0pt;
@@ -909,7 +968,6 @@ function generateWordDocument(article, htmlContent, options = {}) {
     .hl-number { color: #79c0ff; }
     .hl-function { color: #f0883e; }
     .hl-abap-system-var { color: #ff7b72; font-weight: bold; }
-    /* 图片适应版心 */
     img {
       max-width: 100% !important;
       width: auto !important;
@@ -923,10 +981,21 @@ function generateWordDocument(article, htmlContent, options = {}) {
       color: #718096;
       text-align: center;
     }
+    .word-center-stamp {
+      text-align: center;
+      margin: 20pt 0;
+      font-size: 32pt;
+      font-weight: bold;
+      color: #94a3b8;
+      letter-spacing: 6pt;
+      border: 2pt dashed #94a3b8;
+      padding: 8pt 24pt;
+    }
   </style>
 </head>
 <body>
   <div class="Section1">
+    ${isCenterStamp ? `<div class="word-center-stamp">${escapeHtml(watermarkText)}</div>` : ""}
     ${hasHeader ? `<div class="word-header"><p style="margin:0;">${escapeHtml(headerText)}</p></div>` : ""}
     <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
     ${wordSafeHtml}
@@ -1111,6 +1180,7 @@ export default {
       enableFooter: false,
       footerText: "第 1 页 / 共 1 页",
       watermarkText: "",
+      watermarkMode: "tile-dense",
       buttonPosition: "toolbar",
       embedImagesBase64: true,
       includeFrontmatter: true,
@@ -1201,7 +1271,10 @@ export default {
       let selectedFontSize = settings.defaultFontSize;
       let selectedWidth = settings.defaultWidth;
       let selectedMargin = settings.defaultMargin;
+
+      // 水印内容与显示方式
       let selectedWatermark = settings.watermarkText;
+      let selectedWatermarkMode = settings.watermarkMode || "tile-dense";
 
       // 页头与页尾分别独立配置（默认关闭，有就有，没有就没有）
       let selectedEnableHeader = settings.enableHeader;
@@ -1309,13 +1382,31 @@ export default {
                   </div>
                 </div>
 
-                <!-- 背景安全水印 -->
+                <!-- 背景安全水印 (支持系统变量与多种显示方式) -->
                 <div class="edgeever-form-group" id="ee-watermark-group">
                   <label class="edgeever-form-label">
                     背景安全水印
                     <span class="edgeever-form-hint">留空不显示</span>
                   </label>
-                  <input type="text" class="edgeever-input-text" id="ee-watermark-input" placeholder="如：内部资料 / 绝密" value="${escapeHtml(selectedWatermark)}" />
+                  <input type="text" class="edgeever-input-text" id="ee-watermark-input" placeholder="输入水印文字或变量 (如机密资料/{date})" value="${escapeHtml(selectedWatermark)}" />
+                  
+                  <!-- 快捷变量插入标签 -->
+                  <div class="ee-watermark-vars-bar">
+                    <span class="ee-var-chip" data-var="{date}">+ 日期</span>
+                    <span class="ee-var-chip" data-var="{time}">+ 时间</span>
+                    <span class="ee-var-chip" data-var="{datetime}">+ 日期时间</span>
+                    <span class="ee-var-chip" data-var="{title}">+ 文档标题</span>
+                    <span class="ee-var-chip" data-var="绝密内部资料">+ 绝密内部</span>
+                  </div>
+
+                  <!-- 水印显示方式选择 -->
+                  <label class="edgeever-form-label" style="margin-top: 6px; font-size: 11px;">水印显示方式</label>
+                  <div class="edgeever-segment-group" id="ee-watermark-mode-segments">
+                    <button type="button" class="edgeever-segment-btn" data-mode="tile-dense">密集斜向</button>
+                    <button type="button" class="edgeever-segment-btn" data-mode="tile-sparse">稀疏平铺</button>
+                    <button type="button" class="edgeever-segment-btn" data-mode="horizontal">水平规整</button>
+                    <button type="button" class="edgeever-segment-btn" data-mode="center-stamp">居中印章</button>
+                  </div>
                 </div>
 
                 <!-- 高级选项 -->
@@ -1352,6 +1443,8 @@ export default {
               <div class="edgeever-preview-viewport">
                 <!-- 真实纸张画布 -->
                 <div class="edgeever-live-preview-paper" id="ee-live-paper">
+                  <!-- 居中大印章水印图层 -->
+                  <div class="ee-center-stamp-watermark" id="ee-preview-stamp" style="display: none;"></div>
                   <!-- 动态页头 -->
                   <div class="ee-paper-header" id="ee-preview-header-bar" style="display: none;"></div>
                   <!-- 大标题 -->
@@ -1376,6 +1469,7 @@ export default {
       const widthSegments = backdrop.querySelector("#ee-width-segments");
       const marginSegments = backdrop.querySelector("#ee-margin-segments");
       const watermarkInput = backdrop.querySelector("#ee-watermark-input");
+      const watermarkModeSegments = backdrop.querySelector("#ee-watermark-mode-segments");
       const enableHeaderCheck = backdrop.querySelector("#ee-enable-header");
       const headerInputWrap = backdrop.querySelector("#ee-header-input-wrap");
       const headerTextInput = backdrop.querySelector("#ee-header-text");
@@ -1389,6 +1483,7 @@ export default {
       const previewMarginPill = backdrop.querySelector("#ee-preview-margin-pill");
       const previewSizePill = backdrop.querySelector("#ee-preview-size-pill");
       const livePaper = backdrop.querySelector("#ee-live-paper");
+      const previewStamp = backdrop.querySelector("#ee-preview-stamp");
       const previewHeaderBar = backdrop.querySelector("#ee-preview-header-bar");
       const previewFooterBar = backdrop.querySelector("#ee-preview-footer-bar");
       const rawPreview = backdrop.querySelector("#ee-raw-preview");
@@ -1453,7 +1548,34 @@ export default {
         };
       });
 
-      // 水印输入
+      // 水印显示方式切换
+      watermarkModeSegments.querySelectorAll(".edgeever-segment-btn").forEach((btn) => {
+        if (btn.dataset.mode === selectedWatermarkMode) btn.classList.add("is-active");
+        btn.onclick = () => {
+          selectedWatermarkMode = btn.dataset.mode;
+          watermarkModeSegments.querySelectorAll(".edgeever-segment-btn").forEach((b) => b.classList.remove("is-active"));
+          btn.classList.add("is-active");
+          updateUiState();
+        };
+      });
+
+      // 快捷变量芯片点击注入
+      backdrop.querySelectorAll(".ee-var-chip").forEach((chip) => {
+        chip.onclick = () => {
+          const varCode = chip.dataset.var;
+          if (varCode) {
+            const start = watermarkInput.selectionStart || watermarkInput.value.length;
+            const end = watermarkInput.selectionEnd || watermarkInput.value.length;
+            const val = watermarkInput.value;
+            watermarkInput.value = val.substring(0, start) + varCode + val.substring(end);
+            watermarkInput.focus();
+            selectedWatermark = watermarkInput.value;
+            updateUiState();
+          }
+        };
+      });
+
+      // 水印输入监听
       watermarkInput.addEventListener("input", () => {
         selectedWatermark = watermarkInput.value;
         updateUiState();
@@ -1530,13 +1652,22 @@ export default {
             previewFooterBar.textContent = "";
           }
 
-          // 水印
-          const wmSvg = generateWatermarkSvg(selectedWatermark);
-          if (wmSvg) {
-            livePaper.style.backgroundImage = `url("${wmSvg}")`;
-            livePaper.style.backgroundRepeat = "repeat";
-          } else {
+          // 动态解析水印文本（替换变量）
+          const resolvedWatermark = resolveWatermarkVariables(selectedWatermark, article);
+
+          if (selectedWatermarkMode === "center-stamp" && resolvedWatermark.trim()) {
             livePaper.style.backgroundImage = "none";
+            previewStamp.style.display = "block";
+            previewStamp.textContent = resolvedWatermark.trim();
+          } else {
+            previewStamp.style.display = "none";
+            const wmSvg = generateWatermarkBackground(resolvedWatermark, selectedWatermarkMode);
+            if (wmSvg) {
+              livePaper.style.backgroundImage = `url("${wmSvg}")`;
+              livePaper.style.backgroundRepeat = "repeat";
+            } else {
+              livePaper.style.backgroundImage = "none";
+            }
           }
 
           if (selectedFormat === "pdf") {
@@ -1587,16 +1718,20 @@ export default {
       };
       window.addEventListener("keydown", handleKeyDown);
 
-      // 获取当前排版参数对象
+      // 获取当前排版参数对象（包含已解析变量的水印内容及模式）
       function getLayoutOptions() {
         const marginMm = parseInt(selectedMargin, 10) || 20;
         const ptMap = { "12mm": 34, "20mm": 56.7, "28mm": 80 };
+        const resolvedWatermark = resolveWatermarkVariables(selectedWatermark, article);
+
         return {
           fontSize: selectedFontSize,
           contentWidth: selectedWidth,
           marginMm: marginMm,
           marginPt: ptMap[selectedMargin] || 56.7,
-          watermark: selectedWatermark,
+          watermarkRaw: selectedWatermark,
+          watermarkResolved: resolvedWatermark,
+          watermarkMode: selectedWatermarkMode,
           enableHeader: selectedEnableHeader,
           headerText: selectedHeaderText,
           enableFooter: selectedEnableFooter,

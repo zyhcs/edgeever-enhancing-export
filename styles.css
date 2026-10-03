@@ -576,6 +576,52 @@
   text-align: center;
 }
 
+/* 水印快捷变量标签栏 */
+.ee-watermark-vars-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.ee-var-chip {
+  padding: 2px 7px;
+  font-size: 10.5px;
+  background: var(--ee-export-bg-modal);
+  border: 1px solid var(--ee-export-border);
+  border-radius: 4px;
+  color: var(--ee-export-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ee-var-chip:hover {
+  background: var(--ee-export-card-hover);
+  border-color: var(--ee-export-primary);
+  color: var(--ee-export-primary);
+}
+
+/* 页面居中大印章水印 */
+.ee-center-stamp-watermark {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-24deg);
+  font-size: 42px;
+  font-weight: 800;
+  color: rgba(100, 116, 139, 0.12);
+  border: 3.5px dashed rgba(100, 116, 139, 0.16);
+  padding: 10px 30px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 1;
+}
+
 .edgeever-live-preview-paper .preview-title {
   font-size: 1.9em;
   font-weight: 750;
