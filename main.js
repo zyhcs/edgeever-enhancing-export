@@ -611,54 +611,6 @@ function generatePrintWatermarkGridHtml(watermarkText, watermarkMode) {
   return items.join("\n");
 }
 
-// 针对 Word (.doc) 的脱离文档流绝对定位背景水印层（Mac Word、Windows Word、WPS 100% 呈现，且高度为 0，不占正文行高）
-function generateWordWatermarkLayer(watermarkText, watermarkMode) {
-  if (!watermarkText) return "";
-  const clean = escapeHtml(watermarkText);
-
-  if (watermarkMode === "center-stamp") {
-    // 居中大印章：零高度容器 + 绝对定位居中，大标题紧靠顶部开始
-    return `
-      <div style="position: absolute; left: 0; right: 0; top: 220pt; text-align: center; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: -1;">
-        <table border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto; border: none; background: transparent;">
-          <tr>
-            <td align="center" style="border: 2.5pt dashed #cbd5e0; padding: 12pt 36pt; border-radius: 10pt; font-size: 32pt; font-weight: bold; color: #cbd5e0; letter-spacing: 5pt; font-family: 'Microsoft YaHei', 'SimSun', sans-serif;">
-              ${clean}
-            </td>
-          </tr>
-        </table>
-      </div>
-    `;
-  }
-
-  // 平铺与水平模式：4 行跨越整页的绝对定位行，完全脱离正文排版流
-  const rows = [
-    { top: "120pt", left: "20pt" },
-    { top: "300pt", left: "60pt" },
-    { top: "480pt", left: "20pt" },
-    { top: "660pt", left: "60pt" },
-  ];
-
-  const deg = watermarkMode === "horizontal" ? 0 : -25;
-  const size = watermarkMode === "tile-dense" ? "20pt" : "24pt";
-
-  const rowsHtml = rows
-    .map(
-      (r) => `
-    <div style="position: absolute; top: ${r.top}; left: ${r.left}; width: 100%; font-size: ${size}; font-weight: bold; color: #cbd5e0; letter-spacing: 3pt; font-family: 'Microsoft YaHei', 'SimSun', sans-serif; transform: rotate(${deg}deg); -webkit-transform: rotate(${deg}deg);">
-      ${clean}
-    </div>
-  `
-    )
-    .join("\n");
-
-  return `
-    <div style="position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: -1;">
-      ${rowsHtml}
-    </div>
-  `;
-}
-
 // 针对 PDF 打印的 CSS Paged Media 计数器生成器
 function generateCssPrintCounterContent(footerText) {
   if (!footerText) return '""';
@@ -682,14 +634,13 @@ function generateCssPrintCounterContent(footerText) {
   return JSON.stringify(text);
 }
 
-// 针对 Word (.doc) 的原生 VML 底层只读水印（Windows Word 备用双保险）
+// 针对 Word (.doc) 的原生水印（严格封装在后台页眉中，绝不侵入正文，大标题上方绝无多余回车段落）
 function generateWordVmlWatermark(watermarkText, watermarkMode) {
   if (!watermarkText) return "";
   const cleanText = escapeHtml(watermarkText);
 
   const shapetype = `
-    <!--[if gte vml 1]>
-    <v:shapetype id="WordWatermarkShape" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
+    <v:shapetype id="WordWatermarkShapeType" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
       <v:path textpathok="t" o:connecttype="rect"/>
       <v:textpath on="t" fitshape="t"/>
       <v:handles>
@@ -699,50 +650,24 @@ function generateWordVmlWatermark(watermarkText, watermarkMode) {
     </v:shapetype>
   `;
 
-  let shapes = "";
-  if (watermarkMode === "center-stamp") {
-    shapes = `
-      <v:shape id="WM_Center" type="#WordWatermarkShape"
-        style='position:absolute;left:0;top:0;width:480pt;height:140pt;z-index:-251657216;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin;rotation:-28'
-        fillcolor="#94a3b8" stroked="f">
-        <v:fill opacity="0.18"/>
-        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:38pt;font-weight:bold' string="${cleanText}"/>
-      </v:shape>
-    `;
-  } else if (watermarkMode === "horizontal") {
-    const tops = ["150pt", "380pt", "610pt"];
-    shapes = tops
-      .map(
-        (top, idx) => `
-      <v:shape id="WM_H_${idx}" type="#WordWatermarkShape"
-        style='position:absolute;left:0;top:${top};width:460pt;height:65pt;z-index:-251657216;mso-position-horizontal:center;mso-position-horizontal-relative:margin;rotation:0'
-        fillcolor="#94a3b8" stroked="f">
-        <v:fill opacity="0.15"/>
-        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:22pt;font-weight:bold' string="${cleanText}"/>
-      </v:shape>
-    `
-      )
-      .join("\n");
-  } else {
-    const points = [
-      { top: "180pt", left: "10pt" },
-      { top: "500pt", left: "60pt" },
-    ];
-    shapes = points
-      .map(
-        (p, idx) => `
-      <v:shape id="WM_Sparse_${idx}" type="#WordWatermarkShape"
-        style='position:absolute;left:${p.left};top:${p.top};width:380pt;height:90pt;z-index:-251657216;rotation:-26'
-        fillcolor="#94a3b8" stroked="f">
-        <v:fill opacity="0.14"/>
-        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:24pt;font-weight:bold' string="${cleanText}"/>
-      </v:shape>
-    `
-      )
-      .join("\n");
-  }
+  const deg = watermarkMode === "horizontal" ? 0 : -28;
+  const shape = `
+    <v:shape id="WatermarkShape1" type="#WordWatermarkShapeType"
+      style='position:absolute;left:0;top:0;width:480pt;height:140pt;z-index:-251657216;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin;rotation:${deg}'
+      fillcolor="#cbd5e0" stroked="f">
+      <v:fill opacity="0.18"/>
+      <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:38pt;font-weight:bold' string="${cleanText}"/>
+    </v:shape>
+  `;
 
-  return `${shapetype}\n${shapes}\n<![endif]-->`;
+  return `
+    <p class="MsoHeader" style="margin:0; line-height:0; font-size:1pt;">
+      <span style='mso-special-character:watermark'>
+        ${shapetype}
+        ${shape}
+      </span>
+    </p>
+  `;
 }
 
 // 针对 Word (.doc) 的原生域代码页码转换器
@@ -1280,9 +1205,8 @@ function generateWordDocument(article, htmlContent, options = {}) {
     ` : `<p class="MsoFooter" style="margin:0; line-height:0; font-size:1pt;">&nbsp;</p>`}
   </div>
 
-  <!-- 正文区域：包含全端支持的零高度绝对定位水印，大标题正常从顶部起始，绝不占行高 -->
+  <!-- 正文区域：纯粹干净，首个元素直接为大标题，标题上方绝无任何水印段落 -->
   <div class="Section1">
-    ${hasWatermark ? generateWordWatermarkLayer(watermarkText, watermarkMode) : ""}
     <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
     ${wordSafeHtml}
   </div>
