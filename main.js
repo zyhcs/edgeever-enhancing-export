@@ -597,7 +597,132 @@ function renderMarkdownToHtml(markdown) {
   return finalHtml;
 }
 
-// ==================== 6. 独立 HTML 导出生成器 ====================
+// ==================== 6. 打印与 Office 辅助生成器 ====================
+
+// 针对 PDF 打印的 CSS Paged Media 计数器生成器
+function generateCssPrintCounterContent(footerText) {
+  if (!footerText) return '""';
+  let text = footerText.trim();
+  if (/第\s*1\s*页\s*\/\s*共\s*1\s*页/.test(text)) {
+    text = "第 {page} 页 / 共 {pages} 页";
+  }
+
+  if (text.includes("{page}") || text.includes("{pages}")) {
+    const parts = text.split(/(\{page\}|\{pages\})/);
+    const cssParts = parts
+      .filter((p) => p.length > 0)
+      .map((p) => {
+        if (p === "{page}") return "counter(page)";
+        if (p === "{pages}") return "counter(pages)";
+        return JSON.stringify(p);
+      });
+    return cssParts.join(" ");
+  }
+
+  return JSON.stringify(text);
+}
+
+// 针对 Word (.doc) 的原生 VML 底层防选中只读水印生成器
+function generateWordVmlWatermark(watermarkText, watermarkMode) {
+  if (!watermarkText) return "";
+  const cleanText = escapeHtml(watermarkText);
+
+  const shapetype = `
+    <!--[if gte vml 1]>
+    <v:shapetype id="WordWatermarkShape" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
+      <v:path textpathok="t" o:connecttype="rect"/>
+      <v:textpath on="t" fitshape="t"/>
+      <v:handles>
+        <v:h position="#0,bottomRight" xrange="6629,14971"/>
+      </v:handles>
+      <o:lock v:ext="edit" text="t" shapetype="t"/>
+    </v:shapetype>
+  `;
+
+  let shapes = "";
+  if (watermarkMode === "center-stamp") {
+    shapes = `
+      <v:shape id="WM_Center" type="#WordWatermarkShape"
+        style='position:absolute;left:0;top:0;width:480pt;height:140pt;z-index:-251657216;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin;rotation:-28'
+        fillcolor="#94a3b8" stroked="f">
+        <v:fill opacity="0.18"/>
+        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:38pt;font-weight:bold' string="${cleanText}"/>
+      </v:shape>
+    `;
+  } else if (watermarkMode === "horizontal") {
+    const tops = ["150pt", "380pt", "610pt"];
+    shapes = tops
+      .map(
+        (top, idx) => `
+      <v:shape id="WM_H_${idx}" type="#WordWatermarkShape"
+        style='position:absolute;left:0;top:${top};width:460pt;height:65pt;z-index:-251657216;mso-position-horizontal:center;mso-position-horizontal-relative:margin;rotation:0'
+        fillcolor="#94a3b8" stroked="f">
+        <v:fill opacity="0.15"/>
+        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:22pt;font-weight:bold' string="${cleanText}"/>
+      </v:shape>
+    `
+      )
+      .join("\n");
+  } else if (watermarkMode === "tile-dense") {
+    const points = [
+      { top: "80pt", left: "-60pt" },
+      { top: "80pt", left: "240pt" },
+      { top: "320pt", left: "-60pt" },
+      { top: "320pt", left: "240pt" },
+      { top: "560pt", left: "-60pt" },
+      { top: "560pt", left: "240pt" },
+    ];
+    shapes = points
+      .map(
+        (p, idx) => `
+      <v:shape id="WM_Dense_${idx}" type="#WordWatermarkShape"
+        style='position:absolute;left:${p.left};top:${p.top};width:250pt;height:70pt;z-index:-251657216;rotation:-28'
+        fillcolor="#94a3b8" stroked="f">
+        <v:fill opacity="0.13"/>
+        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:18pt;font-weight:bold' string="${cleanText}"/>
+      </v:shape>
+    `
+      )
+      .join("\n");
+  } else {
+    const points = [
+      { top: "180pt", left: "10pt" },
+      { top: "500pt", left: "60pt" },
+    ];
+    shapes = points
+      .map(
+        (p, idx) => `
+      <v:shape id="WM_Sparse_${idx}" type="#WordWatermarkShape"
+        style='position:absolute;left:${p.left};top:${p.top};width:380pt;height:90pt;z-index:-251657216;rotation:-26'
+        fillcolor="#94a3b8" stroked="f">
+        <v:fill opacity="0.14"/>
+        <v:textpath style='font-family:"Microsoft YaHei","SimSun",sans-serif;font-size:24pt;font-weight:bold' string="${cleanText}"/>
+      </v:shape>
+    `
+      )
+      .join("\n");
+  }
+
+  return `${shapetype}\n${shapes}\n<![endif]-->`;
+}
+
+// 针对 Word (.doc) 的原生域代码页码转换器
+function formatWordFooterWithFields(footerText) {
+  if (!footerText) return "";
+  let text = footerText.trim();
+  if (/第\s*1\s*页\s*\/\s*共\s*1\s*页/.test(text)) {
+    text = "第 {page} 页 / 共 {pages} 页";
+  }
+
+  const pageField = `<span style='mso-field-code:" PAGE "'>1</span>`;
+  const pagesField = `<span style='mso-field-code:" NUMPAGES "'>1</span>`;
+
+  return escapeHtml(text)
+    .replace(/\{page\}/g, pageField)
+    .replace(/\{pages\}/g, pagesField);
+}
+
+// ==================== 7. 独立 HTML 与 PDF 打印生成器 ====================
 function generateStandaloneHtml(article, options = {}) {
   const { title, contentHtml } = article;
   const fontSize = options.fontSize || 15;
@@ -608,6 +733,7 @@ function generateStandaloneHtml(article, options = {}) {
   const watermarkMode = options.watermarkMode || "tile-dense";
   const watermarkSvg = generateWatermarkBackground(watermarkText, watermarkMode);
   const isCenterStamp = watermarkMode === "center-stamp" && Boolean(watermarkText);
+  const hasWatermark = Boolean(watermarkText);
 
   // 页头与页尾：有就有，没有就没有
   const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
@@ -615,6 +741,14 @@ function generateStandaloneHtml(article, options = {}) {
 
   const hasFooter = Boolean(options.enableFooter && options.footerText && options.footerText.trim());
   const footerText = hasFooter ? options.footerText.trim() : "";
+
+  // 网页浏览时将 {page} 和 {pages} 格式化
+  const displayFooterText = footerText
+    .replace(/\{page\}/g, "1")
+    .replace(/\{pages\}/g, "1");
+
+  // 打印专用的 CSS 计数器语法
+  const printFooterCssContent = generateCssPrintCounterContent(footerText);
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -642,7 +776,7 @@ function generateStandaloneHtml(article, options = {}) {
       font-size: ${fontSize}px;
       line-height: 1.75;
       -webkit-font-smoothing: antialiased;
-      ${watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
+      ${!isCenterStamp && watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
     }
     .ee-container {
       max-width: ${contentWidth};
@@ -822,22 +956,97 @@ function generateStandaloneHtml(article, options = {}) {
       white-space: nowrap;
       z-index: 1;
     }
+
+    /* 打印专用水印全屏固定图层（默认隐藏，打印时激活） */
+    .ee-print-watermark-overlay {
+      display: none;
+    }
+
     @media print {
       @page {
         size: A4;
         margin: ${options.marginMm ? `${options.marginMm}mm` : "20mm"};
-        ${hasHeader ? `@top-right { content: "${escapeHtml(headerText)}"; }` : ""}
-        ${hasFooter ? `@bottom-center { content: "${escapeHtml(footerText)}"; }` : ""}
+        ${hasHeader ? `@top-right { content: "${escapeHtml(headerText)}"; font-size: 8.5pt; color: #64748b; font-family: sans-serif; }` : ""}
+        ${hasFooter ? `@bottom-center { content: ${printFooterCssContent}; font-size: 8.5pt; color: #64748b; font-family: sans-serif; }` : ""}
       }
-      body { background: #ffffff !important; color: #000000 !important; font-size: 11pt !important; }
-      .ee-container { max-width: 100% !important; padding: 0 !important; }
-      .ee-code-block-wrapper, blockquote, table, img { page-break-inside: avoid; }
-      ${!hasHeader ? ".ee-header { display: none !important; }" : ""}
-      ${!hasFooter ? ".ee-footer { display: none !important; }" : ""}
+      html, body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        font-size: 10.5pt !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      .ee-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      /* 打印时正文流中的页头和页尾彻底隐藏，防止与 @page margin boxes 重复！ */
+      .ee-header,
+      .ee-footer {
+        display: none !important;
+      }
+      /* 打印专用水印全屏固定层：position: fixed 使其在每一页自动被打印机重复渲染！ */
+      .ee-print-watermark-overlay {
+        display: block !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        pointer-events: none !important;
+        z-index: -9999 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .ee-print-watermark-tile {
+        width: 100% !important;
+        height: 100% !important;
+        background-repeat: repeat !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .ee-print-watermark-stamp {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) rotate(-28deg) !important;
+        font-size: 38pt !important;
+        font-weight: 800 !important;
+        color: rgba(100, 116, 139, 0.16) !important;
+        border: 3.5pt dashed rgba(100, 116, 139, 0.2) !important;
+        padding: 12pt 36pt !important;
+        border-radius: 12pt !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        white-space: nowrap !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      /* 超长代码块平滑断页 */
+      .ee-code-block-wrapper {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+      blockquote, table, img {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- 打印与屏幕通用全屏背景水印层 -->
+  ${hasWatermark ? `
+  <div class="ee-print-watermark-overlay" aria-hidden="true">
+    ${isCenterStamp 
+      ? `<div class="ee-print-watermark-stamp">${escapeHtml(watermarkText)}</div>` 
+      : `<div class="ee-print-watermark-tile" style="background-image: url('${watermarkSvg}');"></div>`
+    }
+  </div>
+  ` : ""}
+
   <div class="ee-container">
     ${isCenterStamp ? `<div class="ee-center-stamp-watermark">${escapeHtml(watermarkText)}</div>` : ""}
     ${hasHeader ? `<header class="ee-header"><span>${escapeHtml(headerText)}</span></header>` : ""}
@@ -845,13 +1054,13 @@ function generateStandaloneHtml(article, options = {}) {
     <main class="ee-content">
       ${contentHtml}
     </main>
-    ${hasFooter ? `<footer class="ee-footer"><span>${escapeHtml(footerText)}</span></footer>` : ""}
+    ${hasFooter ? `<footer class="ee-footer"><span>${escapeHtml(displayFooterText)}</span></footer>` : ""}
   </div>
 </body>
 </html>`;
 }
 
-// ==================== 7. Word (.doc) 兼容导出与图片防溢出 ====================
+// ==================== 8. Word (.doc) 兼容导出与原生 VML 水印 ====================
 function adaptImagesForWord(html) {
   if (!html) return "";
   return html.replace(/<img\b([^>]*?)>/gi, (_match, attrs) => {
@@ -877,8 +1086,7 @@ function generateWordDocument(article, htmlContent, options = {}) {
   // 水印与显示方式
   const watermarkText = (options.watermarkResolved || "").trim();
   const watermarkMode = options.watermarkMode || "tile-dense";
-  const watermarkSvg = generateWatermarkBackground(watermarkText, watermarkMode);
-  const isCenterStamp = watermarkMode === "center-stamp" && Boolean(watermarkText);
+  const hasWatermark = Boolean(watermarkText);
 
   // 页头与页尾：有就有，没有就没有
   const hasHeader = Boolean(options.enableHeader && options.headerText && options.headerText.trim());
@@ -888,7 +1096,11 @@ function generateWordDocument(article, htmlContent, options = {}) {
   const footerText = hasFooter ? options.footerText.trim() : "";
 
   return `<!DOCTYPE html>
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<html xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns:m="http://schemas.microsoft.com/office/2004/12/omml"
+      xmlns="http://www.w3.org/TR/REC-html40">
 <head>
   <meta charset='utf-8'>
   <title>${escapeHtml(title || "Word 导出")}</title>
@@ -902,34 +1114,45 @@ function generateWordDocument(article, htmlContent, options = {}) {
   </xml>
   <![endif]-->
   <style>
+    <!--
+    v\\:* {behavior:url(#default#VML);}
+    o\\:* {behavior:url(#default#VML);}
+    w\\:* {behavior:url(#default#VML);}
+    .shape {behavior:url(#default#VML);}
+
     @page Section1 {
       size: 595.3pt 841.9pt;
       margin: ${marginPt}pt ${marginPt}pt ${marginPt}pt ${marginPt}pt;
       mso-header-margin: 36.0pt;
       mso-footer-margin: 36.0pt;
       mso-paper-source: 0;
+      mso-header: h1;
+      mso-footer: f1;
     }
     div.Section1 { page: Section1; position: relative; }
+    p.MsoHeader, li.MsoHeader, div.MsoHeader {
+      margin: 0;
+      margin-bottom: .0001pt;
+      font-size: 9.0pt;
+      font-family: 'Calibri', 'Microsoft YaHei', sans-serif;
+    }
+    p.MsoFooter, li.MsoFooter, div.MsoFooter {
+      margin: 0;
+      margin-bottom: .0001pt;
+      font-size: 9.0pt;
+      font-family: 'Calibri', 'Microsoft YaHei', sans-serif;
+    }
     body {
       font-family: 'Calibri', 'Microsoft YaHei', 'SimSun', sans-serif;
       font-size: 11.0pt;
       line-height: 1.6;
       color: #111111;
-      ${watermarkSvg ? `background-image: url("${watermarkSvg}"); background-repeat: repeat;` : ""}
-    }
-    .word-header {
-      border-bottom: 0.75pt solid #cbd5e0;
-      padding-bottom: 4.0pt;
-      margin-bottom: 18.0pt;
-      font-size: 9.0pt;
-      color: #718096;
-      text-align: right;
     }
     h1.doc-title {
       font-size: 22.0pt;
       font-weight: bold;
       color: #0f172a;
-      margin-top: 10.0pt;
+      margin-top: 6.0pt;
       margin-bottom: 18.0pt;
       border-bottom: 1.5pt solid #cbd5e0;
       padding-bottom: 8.0pt;
@@ -948,7 +1171,6 @@ function generateWordDocument(article, htmlContent, options = {}) {
       color: #4a5568;
       background: #f7fafc;
     }
-    /* 代码块与高亮 */
     .ee-code-block-wrapper {
       margin: 12.0pt 0;
       background: #1e1e24;
@@ -973,33 +1195,42 @@ function generateWordDocument(article, htmlContent, options = {}) {
       width: auto !important;
       height: auto !important;
     }
-    .word-footer {
-      margin-top: 36.0pt;
-      border-top: 0.75pt solid #cbd5e0;
-      padding-top: 8.0pt;
-      font-size: 9.0pt;
-      color: #718096;
-      text-align: center;
-    }
-    .word-center-stamp {
-      text-align: center;
-      margin: 20pt 0;
-      font-size: 32pt;
-      font-weight: bold;
-      color: #94a3b8;
-      letter-spacing: 6pt;
-      border: 2pt dashed #94a3b8;
-      padding: 8pt 24pt;
-    }
+    -->
   </style>
 </head>
 <body>
+  <!-- Word 真实后台页眉：包含 Word 原生底层 VML 锁定水印 + 独立页眉文字 -->
+  <div style='mso-element:header' id=h1>
+    ${hasHeader ? `
+    <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border:none; border-bottom:0.75pt solid #cbd5e0; margin-bottom:12pt;">
+      <tr>
+        <td style="border:none; padding-bottom:4pt; text-align:right; font-size:9.0pt; color:#718096; font-family:'Microsoft YaHei',Calibri,sans-serif;">
+          ${escapeHtml(headerText)}
+        </td>
+      </tr>
+    </table>
+    ` : `<p class="MsoHeader" style="margin:0; line-height:0; font-size:1pt;">&nbsp;</p>`}
+
+    ${hasWatermark ? generateWordVmlWatermark(watermarkText, watermarkMode) : ""}
+  </div>
+
+  <!-- Word 真实后台页脚：包含独立页脚文字与 Word 原生动态页码域 -->
+  <div style='mso-element:footer' id=f1>
+    ${hasFooter ? `
+    <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border:none; border-top:0.75pt solid #cbd5e0; margin-top:12pt;">
+      <tr>
+        <td style="border:none; padding-top:6pt; text-align:center; font-size:9.0pt; color:#718096; font-family:'Microsoft YaHei',Calibri,sans-serif;">
+          ${formatWordFooterWithFields(footerText)}
+        </td>
+      </tr>
+    </table>
+    ` : `<p class="MsoFooter" style="margin:0; line-height:0; font-size:1pt;">&nbsp;</p>`}
+  </div>
+
+  <!-- 正文区域：纯粹干净，首个元素直接为大标题，无任何多余占位元素 -->
   <div class="Section1">
-    ${isCenterStamp ? `<div class="word-center-stamp">${escapeHtml(watermarkText)}</div>` : ""}
-    ${hasHeader ? `<div class="word-header"><p style="margin:0;">${escapeHtml(headerText)}</p></div>` : ""}
     <h1 class="doc-title">${escapeHtml(title || "无标题笔记")}</h1>
     ${wordSafeHtml}
-    ${hasFooter ? `<div class="word-footer"><p style="margin:0;">${escapeHtml(footerText)}</p></div>` : ""}
   </div>
 </body>
 </html>`;
@@ -1178,7 +1409,7 @@ export default {
       enableHeader: false,
       headerText: "",
       enableFooter: false,
-      footerText: "第 1 页 / 共 1 页",
+      footerText: "第 {page} 页 / 共 {pages} 页",
       watermarkText: "",
       watermarkMode: "tile-dense",
       buttonPosition: "toolbar",
@@ -1281,7 +1512,10 @@ export default {
       let selectedHeaderText = settings.headerText || article.title || "";
 
       let selectedEnableFooter = settings.enableFooter;
-      let selectedFooterText = settings.footerText || "第 1 页 / 共 1 页";
+      let selectedFooterText = settings.footerText || "第 {page} 页 / 共 {pages} 页";
+      if (/第\s*1\s*页\s*\/\s*共\s*1\s*页/.test(selectedFooterText)) {
+        selectedFooterText = "第 {page} 页 / 共 {pages} 页";
+      }
 
       let candidateFileName = (article.title || "Note").replace(/[\\/:*?"<>|]/g, "_");
 
@@ -1377,7 +1611,14 @@ export default {
                       <span>显示页尾 (Footer)</span>
                     </label>
                     <div id="ee-footer-input-wrap" style="display: ${selectedEnableFooter ? "block" : "none"}; margin-top: 6px;">
-                      <input type="text" class="edgeever-input-text" id="ee-footer-text" placeholder="页尾内容，如：第 1 页 / 共 1 页" value="${escapeHtml(selectedFooterText)}" />
+                      <input type="text" class="edgeever-input-text" id="ee-footer-text" placeholder="页尾内容，如：第 {page} 页 / 共 {pages} 页" value="${escapeHtml(selectedFooterText)}" />
+                      <!-- 快捷页尾变量标签 -->
+                      <div class="ee-watermark-vars-bar">
+                        <span class="ee-footer-chip" data-var="{page}">+ 当前页码</span>
+                        <span class="ee-footer-chip" data-var="{pages}">+ 总页数</span>
+                        <span class="ee-footer-chip" data-var="第 {page} 页 / 共 {pages} 页">+ 标准页码</span>
+                        <span class="ee-footer-chip" data-var="{title}">+ 文档标题</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1605,6 +1846,26 @@ export default {
         updateUiState();
       });
 
+      // 快捷页尾变量芯片点击注入
+      backdrop.querySelectorAll(".ee-footer-chip").forEach((chip) => {
+        chip.onclick = () => {
+          const varCode = chip.dataset.var;
+          if (varCode) {
+            if (varCode.startsWith("第 {")) {
+              footerTextInput.value = varCode;
+            } else {
+              const start = footerTextInput.selectionStart || footerTextInput.value.length;
+              const end = footerTextInput.selectionEnd || footerTextInput.value.length;
+              const val = footerTextInput.value;
+              footerTextInput.value = val.substring(0, start) + varCode + val.substring(end);
+            }
+            footerTextInput.focus();
+            selectedFooterText = footerTextInput.value;
+            updateUiState();
+          }
+        };
+      });
+
       function updateUiState() {
         const fmtObj = EXPORT_FORMATS.find((f) => f.id === selectedFormat) || EXPORT_FORMATS[0];
         extHint.textContent = fmtObj.ext;
@@ -1643,10 +1904,14 @@ export default {
             previewHeaderBar.textContent = "";
           }
 
-          // 页尾：有就有，没有就没有
+          // 页尾：有就有，没有就没有（预览中将变量智能展现）
           if (selectedEnableFooter && selectedFooterText.trim()) {
             previewFooterBar.style.display = "block";
-            previewFooterBar.textContent = selectedFooterText.trim();
+            const previewText = selectedFooterText
+              .replace(/\{page\}/g, "1")
+              .replace(/\{pages\}/g, "1")
+              .replace(/\{title\}/g, article.title || "");
+            previewFooterBar.textContent = previewText.trim();
           } else {
             previewFooterBar.style.display = "none";
             previewFooterBar.textContent = "";

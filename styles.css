@@ -584,7 +584,8 @@
   margin-top: 6px;
 }
 
-.ee-var-chip {
+.ee-var-chip,
+.ee-footer-chip {
   padding: 2px 7px;
   font-size: 10.5px;
   background: var(--ee-export-bg-modal);
@@ -596,7 +597,8 @@
   user-select: none;
 }
 
-.ee-var-chip:hover {
+.ee-var-chip:hover,
+.ee-footer-chip:hover {
   background: var(--ee-export-card-hover);
   border-color: var(--ee-export-primary);
   color: var(--ee-export-primary);
